@@ -1,5 +1,6 @@
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
+from sqlalchemy.dialects.postgresql import HSTORE
 from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
 from sqlalchemy import (Column, String, DateTime, Time)
 from sqlalchemy.orm import (ColumnProperty, CompositeProperty, SynonymProperty, RelationshipProperty, Mapper, Session)
@@ -9,6 +10,7 @@ from distutils.util import strtobool
 from datetime import date, time, datetime
 from dateutil import parser, tz
 from enum import Enum
+import base64
 
 
 def coerce_value(cls, column, value, size_check=True):
@@ -17,6 +19,13 @@ def coerce_value(cls, column, value, size_check=True):
             raise ValueError("Null value not allowed for property %s of type %r" %
                              (column.key, cls))
         return None
+
+    # specialized types
+    if type(column.type) == HSTORE:
+        if value is None or isinstance(value, dict):
+            # coerce all non-string values of hstore dict
+            return {key: str(val) for key,val in value.items()}
+        raise ValueError("Invalid type %r for property %s of class %r" % (type(value), column.key, cls))
 
     python_type = column.type.python_type
     if python_type is str:
@@ -77,6 +86,9 @@ def coerce_value(cls, column, value, size_check=True):
         except ValueError:
             raise ValueError("Could not convert value to target type for property %s of class %r" %
                              (column.key, cls))
+
+    if python_type is bytes:
+        return base64.b64decode(value)
 
     if issubclass(python_type, Enum) and value is not None:
         value = str(value)

@@ -3,6 +3,7 @@ from datetime import (datetime, date, time, timedelta)
 from isodate import duration_isoformat
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.hybrid import HYBRID_METHOD
+import base64
 
 
 class JSONEncoder(simplejson.JSONEncoder):
@@ -11,7 +12,7 @@ class JSONEncoder(simplejson.JSONEncoder):
     base_type = None
 
     def __init__(self, request, base_type, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(encoding=None, **kwargs)
         self.request = request
         self.obj_index = set()
         self.base_type = base_type
@@ -22,6 +23,10 @@ class JSONEncoder(simplejson.JSONEncoder):
             return o.isoformat()
         if isinstance(o, timedelta):
             return duration_isoformat(o)
+
+        # bytes
+        if type(o) == bytes:
+            return base64.b64encode(o).decode('utf8')
 
         # database objects
         if self.base_type is not None and isinstance(o, self.base_type):
