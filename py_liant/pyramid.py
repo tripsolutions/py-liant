@@ -1,5 +1,6 @@
 from pyramid.request import Request
-from pyramid.httpexceptions import (HTTPNotFound, HTTPServerError, HTTPConflict, HTTPOk)
+from pyramid.httpexceptions import (
+    HTTPNotFound, HTTPServerError, HTTPConflict, HTTPOk)
 from sqlalchemy.orm.util import AliasedClass
 from sqlalchemy.orm.exc import NoResultFound, StaleDataError
 from sqlalchemy.orm.base import NOT_EXTENSION
@@ -13,12 +14,13 @@ from .json_decoder import JSONDecoder
 from .monkeypatch import coerce_value
 
 
-# Returns a renderer for pyramid; base_type (SQLAlchemy declarative base) is needed to detect sqlalchemy object
-# instances
+# Returns a renderer for pyramid; base_type (SQLAlchemy declarative base) is
+# needed to detect sqlalchemy object instances
 # Sample usage:
 #     config.add_renderer('json', pyramid_json_renderer_factory(Base))
 
-def pyramid_json_renderer_factory(base_type=None, stream_method=2, separators=(',', ':')):
+def pyramid_json_renderer_factory(base_type=None, stream_method=2,
+                                  separators=(',', ':')):
     def _json_renderer(info):
         def _render(value, system):
             request = system.get('request')
@@ -29,7 +31,8 @@ def pyramid_json_renderer_factory(base_type=None, stream_method=2, separators=('
                 response.charset = 'utf8'
 
                 json_encoder = JSONEncoder(request, base_type=base_type,
-                                           separators=separators, check_circular=False)
+                                           separators=separators,
+                                           check_circular=False)
 
                 # solution 1: write to stream from renderer
                 if stream_method == 0:
@@ -48,7 +51,8 @@ def pyramid_json_renderer_factory(base_type=None, stream_method=2, separators=('
             else:
                 # fallback for direct calls, useful for rapid
 
-                json_encoder = JSONEncoder(None, base_type=base_type, separators=separators)
+                json_encoder = JSONEncoder(
+                    None, base_type=base_type, separators=separators)
                 return json_encoder.encode(value)
         return _render
     return _json_renderer
@@ -65,8 +69,8 @@ class VersionCheckError(RuntimeError):
     pass
 
 
-# Extend this and decorate accordingly; methods list, get, insert, update, delete should be decorated with
-# pyramid @view_config
+# Extend this and decorate accordingly; methods list, get, insert, update,
+# delete should be decorated with pyramid @view_config
 class CRUDView(object):
     filters = dict()
     accept_order = dict()
@@ -102,22 +106,27 @@ class CRUDView(object):
         try:
             query = self.get_identity_base()
             if update_lock:
-                # (partially a) SQLAlchemy bug: Postgres doesn't allow qualified table names in
-                # FOR UPDATE OF statements, so whenever targeted locks are required an alias is necessary,
+                # (partially a) SQLAlchemy bug: Postgres doesn't allow
+                # qualified table names in FOR UPDATE OF statements, so
+                # whenever targeted locks are required an alias is necessary,
                 # for us at least since we use schemas for all tables
                 if isinstance(self.target_type, AliasedClass):
                     query = query.with_for_update(of=self.target_type)
                 else:
                     query = query.with_for_update()
-            return query.filter(self.context_filter, self.identity_filter).one()
+            return query.filter(self.context_filter, self.identity_filter) \
+                .one()
         except NoResultFound:
             raise HTTPNotFound()
 
     def get_query_filters(self, exclude=None):
         tmp = [self.filters[key](self.request.GET[key]) for key in self.filters
-               if key in self.request.GET and (exclude is None or key not in exclude)]
-        return [i for i in tmp if not isinstance(i, (list, tuple)) and i is not None] + \
-               [i for j in tmp if isinstance(j, (list, tuple)) and j is not None for i in j if i is not None] + \
+               if key in self.request.GET and
+               (exclude is None or key not in exclude)]
+        return [i for i in tmp if not isinstance(i, (list, tuple))
+                and i is not None] + \
+               [i for j in tmp if isinstance(j, (list, tuple))
+                and j is not None for i in j if i is not None] + \
             self.runtime_filters()
 
     def runtime_filters(self):
@@ -131,13 +140,18 @@ class CRUDView(object):
     def order_clauses(self):
         if 'order' not in self.request.GET or self.request.GET['order'] == "":
             return [False]
-        orders = [(item[:-5], True) if item.endswith(' desc') else (item, False)
+        orders = [(item[:-5], True) if item.endswith(' desc')
+                  else(item, False)
                   for item in self.request.GET['order'].split(",")]
         if any([order[0] not in self.accept_order for order in orders]):
-            raise HTTPServerError("not implemented, order by " +
-                                  ", ".join([order[0] for order in orders if order[0] not in self.accept_order]))
-        # return [self.accept_order[order[0]].desc() if order[1] else self.accept_order[order[0]] for order in orders]
-        selected = [(self.accept_order[order[0]], order[1]) for order in orders]
+            invalid_order = [order[0] for order in orders
+                             if order[0] not in self.accept_order]
+            raise HTTPServerError(
+                f'not implemented, order by {", ".join(invalid_order)}'
+            )
+
+        selected = [(self.accept_order[order[0]], order[1])
+                    for order in orders]
         for item in selected:
             if isinstance(item[0], list):
                 for elem in item[0]:
@@ -152,7 +166,8 @@ class CRUDView(object):
         page_size = int(self.request.GET['pageSize'])
         if page_size <= 0:
             return False
-        page = int(self.request.GET['page']) if 'page' in self.request.GET else 0
+        page = int(self.request.GET['page']
+                   ) if 'page' in self.request.GET else 0
         return slice(page * page_size, page * page_size + page_size)
 
     def get_base_query(self):
@@ -174,7 +189,8 @@ class CRUDView(object):
         if self.use_subquery_after_filter:
             query = query.subquery()
             self.accept_order = dict(query.c)
-            query = self.request.dbsession.query(*query.c).order_by(*self.order_clauses)
+            query = self.request.dbsession.query(
+                *query.c).order_by(*self.order_clauses)
         else:
             query = query.order_by(*self.order_clauses)
         return query[pager] if pager else query.all(), count
@@ -200,7 +216,7 @@ class CRUDView(object):
                     raise HTTPConflict(str(ex))
         except StaleDataError as ex:
             raise HTTPConflict(str(ex))
-        return self.get()
+        return self.request.dbsession.merge(old)
 
     def insert(self):
         obj = self.target_type()
@@ -218,7 +234,13 @@ class CRUDView(object):
         return HTTPOk()
 
     @classmethod
-    def auto_filters(cls, target=None, prefix=''):
+    def auto_fields(cls, target):
+        return [item for item in inspect(target).all_orm_descriptors.values()
+                if item.is_attribute and item.extension_type == NOT_EXTENSION
+                and isinstance(item.property, ColumnProperty)]
+
+    @classmethod
+    def auto_filters(cls, target=None, prefix=None):
         if target is None:
             target = cls.target_type
 
@@ -226,26 +248,29 @@ class CRUDView(object):
             return coerce_value(target, attr.property.columns[0], x, False)
 
         ret = dict()
-        for item in [item for item in inspect(target).all_orm_descriptors.values()
-                     if item.is_attribute and item.extension_type == NOT_EXTENSION
-                     and isinstance(item.property, ColumnProperty)]:
-            key = prefix + item.key
+
+        for item in cls.auto_fields(target):
+            key = prefix + item.key if prefix is not None else item.key
             ret[key] = lambda x, attr=item: attr == coerce_func(x, attr)
             if isinstance(item.property.columns[0].type, String):
-                ret[key + "_like"] = lambda x, attr=item: attr.ilike('%' + x + '%')
-            ret[key + "_gt"] = lambda x, attr=item: attr > coerce_func(x, attr)
-            ret[key + "_ge"] = lambda x, attr=item: attr >= coerce_func(x, attr)
-            ret[key + "_lt"] = lambda x, attr=item: attr < coerce_func(x, attr)
-            ret[key + "_le"] = lambda x, attr=item: attr <= coerce_func(x, attr)
+                ret[f'{key}_like'] = \
+                    lambda x, attr=item: attr.ilike('%' + x + '%')
+            ret[f'{key}_gt'] = \
+                lambda x, attr=item: attr > coerce_func(x, attr)
+            ret[f'{key}_ge'] = \
+                lambda x, attr=item: attr >= coerce_func(x, attr)
+            ret[f'{key}_lt'] = \
+                lambda x, attr=item: attr < coerce_func(x, attr)
+            ret[f'{key}_le'] = \
+                lambda x, attr=item: attr <= coerce_func(x, attr)
         return ret
 
     @classmethod
-    def auto_order(cls, target=None, prefix=''):
+    def auto_order(cls, target=None, prefix=None):
         if target is None:
             target = cls.target_type
         ret = dict()
-        for attr in [item for item in inspect(target).all_orm_descriptors.values()
-                     if item.is_attribute and item.extension_type == NOT_EXTENSION
-                     and isinstance(item.property, ColumnProperty)]:
-            ret[prefix + attr.key] = attr
+        for attr in cls.auto_fields(target):
+            key = prefix + attr.key if prefix is not None else attr.key
+            ret[key] = attr
         return ret

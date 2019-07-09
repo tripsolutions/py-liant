@@ -13,7 +13,8 @@ from setuptools import find_packages, setup, Command
 
 # Package meta-data.
 NAME = 'py_liant'
-DESCRIPTION = 'Glue together pyramid, sqlalchemy, simplejson to provide a read-write, object-graph-aware JSON API'
+DESCRIPTION = 'Glue together pyramid, sqlalchemy, simplejson to provide a ' \
+    'read-write, object-graph-aware JSON API'
 URL = 'https://github.com/georgebarbarosie/py-liant'
 EMAIL = 'george.barbarosie@gmail.com'
 AUTHOR = 'George Barbăroșie'
@@ -22,13 +23,9 @@ VERSION = None
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'pyramid', 'SQLAlchemy', 'simplejson', 'isodate', 'python_dateutil', 'transaction'
+    'pyramid', 'SQLAlchemy', 'simplejson', 'isodate', 'python_dateutil',
+    'transaction'
 ]
-
-# The rest you shouldn't have to touch too much :)
-# ------------------------------------------------
-# Except, perhaps the License and Trove Classifiers!
-# If you do change the License, remember to change the Trove Classifier for that!
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -71,7 +68,7 @@ class UploadCommand(Command):
             pass
 
         self.status('Building Source and Wheel (universal) distribution…')
-        os.system('{0} setup.py sdist bdist_wheel --universal'.format(sys.executable))
+        os.system(f'{sys.executable} setup.py sdist bdist_wheel --universal')
 
         self.status('Uploading the package to PyPi via Twine…')
         os.system('twine upload dist/*')
