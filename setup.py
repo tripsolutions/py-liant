@@ -24,7 +24,7 @@ VERSION = None
 # What packages are required for this module to be executed?
 REQUIRED = [
     'pyramid', 'SQLAlchemy', 'simplejson', 'isodate', 'python_dateutil',
-    'transaction'
+    'transaction', 'pyparsing'
 ]
 
 here = os.path.abspath(os.path.dirname(__file__))

@@ -4,14 +4,16 @@ from pyramid.httpexceptions import (
 from sqlalchemy.orm.util import AliasedClass
 from sqlalchemy.orm.exc import NoResultFound, StaleDataError
 from sqlalchemy.orm.base import NOT_EXTENSION
-from sqlalchemy.orm import ColumnProperty
-from sqlalchemy import String
+from sqlalchemy.orm import ColumnProperty, RelationshipProperty
+from sqlalchemy import String, orm, and_
 from sqlalchemy.inspection import inspect
 import transaction
+
 
 from .json_encoder import JSONEncoder
 from .json_decoder import JSONDecoder
 from .monkeypatch import coerce_value
+from .hints_parser import hints_parser
 
 
 # Returns a renderer for pyramid; base_type (SQLAlchemy declarative base) is
@@ -274,3 +276,169 @@ class CRUDView(object):
             key = prefix + attr.key if prefix is not None else attr.key
             ret[key] = attr
         return ret
+
+
+class ConvertMatchdictPredicate:
+    def __init__(self, args, config):
+        assert len(args) >= 1 and (type(args[0]) == tuple or
+                                   callable(args[0]))
+        self.args = args
+
+    def text(self):
+        return f'convert_matchdict={self.args!r}'
+
+    phash = text
+
+    def __call__(self, context, request):
+        args = self.args if type(self.args[0]) == tuple else(self.args,)
+        match = request.matchdict
+        for argList in args:
+            argType = argList[0]
+            assert callable(argType)
+            for arg in (argList[1:]):
+                if arg in match:
+                    try:
+                        match[arg] = argType(match[arg])
+                    except (TypeError, ValueError):
+                        return False
+        return True
+
+
+class CatchallPredicate:
+    def __init__(self, targets, config):
+        self.targets = {
+            key: (cls, CatchallPredicate.get_hints(hint, cls))
+            if type(hint) is str else (cls, hint)
+            for key, (cls, hint) in targets.items()
+        }
+
+    def text(self):
+        return f'catchall={self.targets!r}'
+
+    phash = text
+
+    def __call__(self, context, request):
+        match = request.matchdict
+
+        # convert target to type
+        if 'target' not in match:
+            return False
+
+        target = match['target']
+        if target not in self.targets:
+            return False
+
+        match['target'] = self.targets[target][0]
+
+        insp = inspect(match['target'])
+
+        # convert pkey
+        if 'pkey' in match:
+            pkey = match['pkey'].split(',')
+            if len(pkey) != len(insp.primary_key):
+                return False
+
+            try:
+                pkey = [col == coerce_value(target, col, val)
+                        for col, val in zip(insp.primary_key, pkey)]
+            except ValueError:
+                return False
+
+            match['pkey'] = pkey
+
+        # decode hints
+        if 'hints' in match:
+            match['hints'] = self.get_hints(match['hints'], match['target'])
+        else:
+            match['hints'] = self.targets[target][1]
+
+        return True
+
+    @staticmethod
+    def get_hints(value, cls=None, base=orm):
+        # hints structure: [atom(,atom)+]
+        # atom is one of:
+        #  +field_name: undefer field (include)
+        #  -field_name: defer field (exclude)
+        #  TODO if field_name is "ALL", defer or undefer all fields
+        #   (DOES NOT AFFECT COLLECTIONS, see below)
+        #  *collection(-x)?(\(hints\))?:
+        #   eager load collection (-x marks subquery laod preference);
+        #   hints in parantheses recursively apply to elements of
+        #   the collection
+        if type(value) is str:
+            value = hints_parser.parseString(value, True)
+        hints = []
+        insp = inspect(cls)
+        # keep track of joined relationship in current batch
+        # joined_relationship = False
+        for item in value:
+            name = item['name']
+            op = item['op']
+            prop = insp.get_property(name)
+            hint = None
+            if isinstance(prop, ColumnProperty):
+                if op == '+':
+                    hint = base.undefer(name)
+                elif op == '-':
+                    hint = base.defer(name)
+                else:
+                    raise AssertionError("invalid op")
+            elif isinstance(prop, RelationshipProperty):
+                # if joined_relationship:
+                #     hint = base.subqueryload(name)
+                # else:
+                #     hint = base.joinedload(name)
+                #     joined_relationship = True
+                hint = base.selectinload(name)
+
+                if 'children' in item:
+                    remote_table = {col.table for col in prop.remote_side}
+                    assert len(remote_table) == 1
+                    remote_table = remote_table.pop()
+                    remote_class = next(_ for _ in cls._decl_class_registry
+                                        .values() if isinstance(_, type)
+                                        and hasattr(_, '__table__')
+                                        and _.__table__ is remote_table)
+                    # attach joined class hints
+                    CatchallPredicate.get_hints(item['children'], remote_class,
+                                                hint)
+            hints.append(hint)
+        return hints
+
+
+# base class to decorate with a CatchAllPredicate
+class CatchallView(CRUDView):
+    context = None
+    request = None
+    hints = []
+
+    def __init__(self, request):
+        super().__init__(request)
+
+        self.target_type = self.request.matchdict['target']
+        self.target_name = self.target_type.__tablename__
+
+        self.filters = self.auto_filters(target=self.target_type)
+        self.accept_order = self.auto_order(target=self.target_type)
+
+        if 'pkey' in self.request.matchdict:
+            self.key = self.request.matchdict['pkey']
+        if 'hints' in self.request.matchdict:
+            self.hints = self.request.matchdict['hints']
+
+    @property
+    def identity_filter(self):
+        return and_(*self.key)
+
+    def get_identity_base(self):
+        query = self.get_base_query()
+        if self.hints and len(self.hints):
+            query = query.options(*self.hints)
+        return query
+
+    def get_list_base(self):
+        query = self.get_base_query()
+        if self.hints and len(self.hints):
+            query = query.options(*self.hints)
+        return query
