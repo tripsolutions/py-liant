@@ -1,6 +1,6 @@
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
-from sqlalchemy.dialects.postgresql import HSTORE
+from sqlalchemy.dialects.postgresql import HSTORE, UUID
 from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
 from sqlalchemy import (Column, String, DateTime, Time)
 from sqlalchemy.orm import (
@@ -13,6 +13,7 @@ from datetime import date, time, datetime
 from dateutil import parser, tz
 from enum import Enum
 import base64
+import uuid
 
 
 def coerce_value(cls, column, value, size_check=True):
@@ -23,16 +24,27 @@ def coerce_value(cls, column, value, size_check=True):
                 f'{cls!r}')
         return None
 
-    # specialized types
-    if type(column.type) == HSTORE:
-        if value is None or isinstance(value, dict):
-            # coerce all non-string values of hstore dict
-            return {key: str(val) for key, val in value.items()}
-        raise ValueError(
-            f'Invalid type {type(value)!r} for property {column.key} of class '
-            f' {cls!r}')
+    print(cls, column, value, size_check, column.type)
+    try:
+        python_type = column.type.python_type
+    except NotImplementedError:
+        # SA types that don't implement python_type treated early and explicity
+        if column.type is HSTORE or type(column.type) is HSTORE:
+            if value is None or isinstance(value, dict):
+                # coerce all non-string values of hstore dict
+                return {key: str(val) for key, val in value.items()}
+            raise ValueError(
+                f'Invalid type {type(value)!r} for property {column.key} of '
+                f'class {cls!r}')
+        if column.type is UUID or type(column.type) is UUID:
+            if column.type.as_uuid:
+                if type(value) is int:
+                    return uuid.UUID(int=value)
+                return uuid.UUID(value)
+            return str(value)
+        raise NotImplementedError(f'py_liant does not support {column.type!r} '
+                                  'yet')
 
-    python_type = column.type.python_type
     if python_type is str:
         if value is not str:
             value = str(value)

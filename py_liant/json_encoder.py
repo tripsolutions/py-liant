@@ -7,6 +7,7 @@ from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
 import base64
 from collections import OrderedDict
 from enum import Enum
+import uuid
 
 
 class JSONEncoder(simplejson.JSONEncoder):
@@ -34,6 +35,10 @@ class JSONEncoder(simplejson.JSONEncoder):
         # enums
         if isinstance(o, Enum):
             return o.name
+
+        # UUIDs
+        if isinstance(o, uuid.UUID):
+            return str(o)
 
         # database objects
         if self.base_type is not None and isinstance(o, self.base_type):

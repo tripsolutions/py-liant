@@ -393,16 +393,8 @@ class CatchallPredicate:
                 hint = base.selectinload(name)
 
                 if 'children' in item:
-                    remote_table = {col.table for col in prop.remote_side}
-                    assert len(remote_table) == 1
-                    remote_table = remote_table.pop()
-                    remote_class = next(_ for _ in cls._decl_class_registry
-                                        .values() if isinstance(_, type)
-                                        and hasattr(_, '__table__')
-                                        and _.__table__ is remote_table)
-                    # attach joined class hints
-                    CatchallPredicate.get_hints(item['children'], remote_class,
-                                                hint)
+                    CatchallPredicate.get_hints(item['children'],
+                                                prop.entity, hint)
             hints.append(hint)
         return hints
 

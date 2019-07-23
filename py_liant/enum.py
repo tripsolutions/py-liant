@@ -1,5 +1,5 @@
 import re
-from sqlalchemy.types import SchemaType, TypeDecorator, Enum as SqlEnum
+from sqlalchemy.types import SchemaType, TypeDecorator, Enum
 
 
 def EnumAttrs(name, schema=None, json_use_values=False):
@@ -13,7 +13,7 @@ def EnumAttrs(name, schema=None, json_use_values=False):
 
 
 class PythonEnum(TypeDecorator, SchemaType):
-    impl = SqlEnum
+    impl = Enum
 
     def __init__(self, enum_class, **kw):
         if hasattr(enum_class, "__db_name") and 'name' not in kw:
@@ -24,7 +24,7 @@ class PythonEnum(TypeDecorator, SchemaType):
             kw['name'] = "ck%s" % re.sub('([A-Z])',
                                          lambda m: '_' + m.group(1).lower(),
                                          enum_class.__name__)
-        self.impl = SqlEnum(*(m.name for m in enum_class), **kw)
+        self.impl = Enum(*(m.name for m in enum_class), **kw)
         # super().__init__(*(m.name for m in enum_class), **kw)
         self._enum_class = enum_class
 
