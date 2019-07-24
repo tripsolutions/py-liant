@@ -15,7 +15,7 @@ class JSONEncoder(simplejson.JSONEncoder):
     obj_index = None
     base_type = None
 
-    def __init__(self, request, base_type, **kwargs):
+    def __init__(self, request=None, base_type=None, **kwargs):
         super().__init__(encoding=None, **kwargs)
         self.request = request
         self.obj_index = set()

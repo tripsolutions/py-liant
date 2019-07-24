@@ -51,10 +51,9 @@ def pyramid_json_renderer_factory(base_type=None, stream_method=2,
                     response.app_iter = _iterencode(value)
                     return None
             else:
-                # fallback for direct calls, useful for rapid
-
-                json_encoder = JSONEncoder(
-                    None, base_type=base_type, separators=separators)
+                # fallback for direct calls?
+                json_encoder = JSONEncoder(base_type=base_type,
+                                           separators=separators)
                 return json_encoder.encode(value)
         return _render
     return _json_renderer
@@ -205,7 +204,7 @@ class CRUDView(object):
         return dict(items=items, total=count)
 
     def apply_changes(self, obj, data, for_update=True):
-        obj.apply_changes(data)
+        obj.apply_changes(data, context=self.context)
 
     def update(self):
         try:
@@ -403,7 +402,7 @@ class CatchallPredicate:
 class CatchallView(CRUDView):
     context = None
     request = None
-    hints = []
+    hints = None
 
     def __init__(self, request):
         super().__init__(request)
