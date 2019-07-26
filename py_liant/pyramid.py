@@ -204,7 +204,7 @@ class CRUDView(object):
         return dict(items=items, total=count)
 
     def apply_changes(self, obj, data, for_update=True):
-        obj.apply_changes(data, context=self.context)
+        obj.apply_changes(data, context=self.context, for_update=for_update)
 
     def update(self):
         try:

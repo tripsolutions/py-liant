@@ -12,6 +12,7 @@ from distutils.util import strtobool
 from datetime import date, time, datetime
 from dateutil import parser, tz
 from enum import Enum
+from .interfaces import ChangeGuardProvider
 import base64
 import uuid
 
@@ -169,14 +170,21 @@ def _polymorphic_constructor(cls, data):
     return cls.__mapper__.polymorphic_map[identity].class_()
 
 
-def __apply_changes(self, data, object_dict=None):
+def __apply_changes(self, data, object_dict=None, context=None,
+                    for_update=True):
     if object_dict is None:
         object_dict = dict()
+
     # register in object dictionary to prevent loops and worse
     if self in object_dict:
         return
     object_dict[data] = self
     mapper = inspect(type(self))
+
+    if isinstance(context, ChangeGuardProvider):
+        if set(data.keys()) - {col.name for col in mapper.primary_key}:
+            if not context.guard(self, data, for_update):
+                return
 
     for key, attr in mapper.all_orm_descriptors.items():
         if key not in data:
@@ -217,7 +225,8 @@ def __apply_changes(self, data, object_dict=None):
             elif isinstance(prop, SynonymProperty):
                 raise NotImplementedError('synonym properties not supported')
             elif isinstance(prop, RelationshipProperty):
-                __apply_collection_changes(self, attr, value, object_dict)
+                __apply_collection_changes(self, attr, value, object_dict,
+                                           context)
             else:
                 raise AssertionError(
                     f'Unexpected property type {type(prop)!r} in '
@@ -231,7 +240,7 @@ def __apply_changes(self, data, object_dict=None):
                 f'in {type(self)!r}: {key}')
 
 
-def __apply_collection_changes(self, attr, value, object_dict):
+def __apply_collection_changes(self, attr, value, object_dict, context):
     prop = attr.property
     child_class = prop.argument
 
@@ -274,6 +283,7 @@ def __apply_collection_changes(self, attr, value, object_dict):
                 if pk_incomplete:
                     child_obj = _polymorphic_constructor(
                         child_class, item)
+                    for_update = False
                 else:
                     child_obj = Session.object_session(
                         self).query(child_class).get(pk)
@@ -281,18 +291,25 @@ def __apply_collection_changes(self, attr, value, object_dict):
                         if child_class.__table__._autoincrement_column is None:
                             child_obj = _polymorphic_constructor(
                                 child_class, value)
+                            for_update = False
                         else:
                             raise AssertionError(
                                 f'Could not find object of {child_class!r}'
                                 f'[{pk!r}] in database')
+                    else:
+                        for_update = True
                 object_map[item] = child_obj
+                __apply_changes(child_obj, item, object_dict, context,
+                                for_update)
             else:
-                object_map[item] = remote_pk_map[tuple(pk)]
+                child_obj = remote_pk_map[tuple(pk)]
+                object_map[item] = child_obj
+                __apply_changes(child_obj, item, object_dict, context,
+                                True)
 
         for local, remote in object_map.items():
             if remote not in collection:
                 collection.append(remote)
-            __apply_changes(remote, local, object_dict)
 
         for item in collection:
             if item not in object_map.values():
@@ -331,6 +348,7 @@ def __apply_collection_changes(self, attr, value, object_dict):
                     if pk_incomplete:
                         child_obj = _polymorphic_constructor(
                             child_class, value)
+                        for_update = False
                     else:
                         child_obj = Session.object_session(
                             self).query(child_class).get(pk)
@@ -339,15 +357,19 @@ def __apply_collection_changes(self, attr, value, object_dict):
                                     is None:
                                 child_obj = _polymorphic_constructor(
                                     child_class, value)
+                                for_update = False
                             else:
                                 raise AssertionError(
                                     f'Could not find object of {child_class!r}'
                                     f'[{pk!r}] in database')
-                    __apply_changes(child_obj, value, object_dict)
+                        else:
+                            for_update = True
+                    __apply_changes(child_obj, value, object_dict, context,
+                                    for_update)
                     attr.__set__(self, child_obj)
                 else:
-                    __apply_changes(
-                        current_value, value, object_dict)
+                    __apply_changes(current_value, value, object_dict,
+                                    context, True)
 
 
 def patch_sqlalchemy_base_class(base_class: type):
