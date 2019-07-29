@@ -183,7 +183,7 @@ def __apply_changes(self, data, object_dict=None, context=None,
 
     if isinstance(context, JsonGuardProvider):
         if set(data.keys()) - {col.name for col in mapper.primary_key}:
-            if not context.guard(self, data, for_update):
+            if not context.guardUpdate(self, data, for_update):
                 return
 
     for key, attr in mapper.all_orm_descriptors.items():
