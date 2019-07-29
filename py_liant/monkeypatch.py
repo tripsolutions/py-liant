@@ -12,7 +12,7 @@ from distutils.util import strtobool
 from datetime import date, time, datetime
 from dateutil import parser, tz
 from enum import Enum
-from .interfaces import ChangeGuardProvider
+from .interfaces import JsonGuardProvider
 import base64
 import uuid
 
@@ -181,7 +181,7 @@ def __apply_changes(self, data, object_dict=None, context=None,
     object_dict[data] = self
     mapper = inspect(type(self))
 
-    if isinstance(context, ChangeGuardProvider):
+    if isinstance(context, JsonGuardProvider):
         if set(data.keys()) - {col.name for col in mapper.primary_key}:
             if not context.guard(self, data, for_update):
                 return

@@ -8,6 +8,8 @@ import base64
 from collections import OrderedDict
 from enum import Enum
 import uuid
+from .interfaces import JsonGuardProvider
+from .json_object import JsonObject
 
 
 class JSONEncoder(simplejson.JSONEncoder):
@@ -65,7 +67,7 @@ class JSONEncoder(simplejson.JSONEncoder):
             # all relevant paths are loaded
             # TODO: investigate how to improve selection criteria or
             # TODO:   modularize them
-            ret = {
+            ret = JsonObject({
                 key: getattr(o, key)
                 for key, value in mapper.all_orm_descriptors.items()
                 if key != '__mapper__' and key not in state.unloaded
@@ -73,8 +75,11 @@ class JSONEncoder(simplejson.JSONEncoder):
                                                  ASSOCIATION_PROXY)
                 and (not hasattr(value, 'property')
                      or value.property not in composite_props)
-            }
+            })
             ret.update(_id=pk_str)
+            if self.request is not None and isinstance(self.request.context,
+                                                       JsonGuardProvider):
+                self.request.context.guardSerialize(o, ret)
             return OrderedDict(ret)
 
         # end of handled types, we cannot serialize this type

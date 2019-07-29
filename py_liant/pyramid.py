@@ -14,6 +14,7 @@ from .json_encoder import JSONEncoder
 from .json_decoder import JSONDecoder
 from .monkeypatch import coerce_value
 from .hints_parser import hints_parser
+from .interfaces import JsonGuardProvider
 
 
 # Returns a renderer for pyramid; base_type (SQLAlchemy declarative base) is
@@ -305,10 +306,13 @@ class ConvertMatchdictPredicate:
 
 class CatchallPredicate:
     def __init__(self, targets, config):
+        def _adapt(obj):
+            if type(obj) is not tuple:
+                return (obj,)
+            return obj
+
         self.targets = {
-            key: (cls, CatchallPredicate.get_hints(hint, cls))
-            if type(hint) is str else (cls, hint)
-            for key, (cls, hint) in targets.items()
+            key: _adapt(obj) for key, obj in targets.items()
         }
 
     def text(self):
@@ -323,13 +327,14 @@ class CatchallPredicate:
         if 'target' not in match:
             return False
 
-        target = match['target']
-        if target not in self.targets:
+        if match['target'] not in self.targets:
             return False
 
-        match['target'] = self.targets[target][0]
+        target_attrs = self.targets[match['target']]
 
-        insp = inspect(match['target'])
+        match['target'] = target_attrs[0]
+
+        insp = inspect(target_attrs[0])
 
         # convert pkey
         if 'pkey' in match:
@@ -338,23 +343,27 @@ class CatchallPredicate:
                 return False
 
             try:
-                pkey = [col == coerce_value(target, col, val)
+                pkey = [col == coerce_value(match['target'], col, val)
                         for col, val in zip(insp.primary_key, pkey)]
             except ValueError:
                 return False
 
             match['pkey'] = pkey
-
         # decode hints
         if 'hints' in match:
-            match['hints'] = self.get_hints(match['hints'], match['target'])
+            match['hints'] = self.get_hints(match['hints'], match['target'],
+                                            context=context)
         else:
-            match['hints'] = self.targets[target][1]
+            match['hints'] = (self.get_hints(target_attrs[1], match['target'],
+                                             context=context)
+                              if len(target_attrs) > 1 and target_attrs[1]
+                              else self.get_hints("", match['target'],
+                                                  context=context))
 
         return True
 
     @staticmethod
-    def get_hints(value, cls=None, base=orm):
+    def get_hints(value, cls, base=orm, context=None):
         # hints structure: [atom(,atom)+]
         # atom is one of:
         #  +field_name: undefer field (include)
@@ -366,36 +375,39 @@ class CatchallPredicate:
         #   hints in parantheses recursively apply to elements of
         #   the collection
         if type(value) is str:
-            value = hints_parser.parseString(value, True)
-        hints = []
+            if len(value):
+                value = hints_parser.parseString(value, True)
+            else:
+                value = []
+
         insp = inspect(cls)
-        # keep track of joined relationship in current batch
-        # joined_relationship = False
+        hints = {}
         for item in value:
             name = item['name']
             op = item['op']
             prop = insp.get_property(name)
+            hints[prop.class_attribute] = (op, item.get('children'))
+        if isinstance(context, JsonGuardProvider):
+            context.guardHints(cls, hints)
+        ret = []
+        for attr, (op, children) in hints.items():
+            prop = attr.prop
             hint = None
             if isinstance(prop, ColumnProperty):
                 if op == '+':
-                    hint = base.undefer(name)
+                    hint = base.undefer(attr)
                 elif op == '-':
-                    hint = base.defer(name)
+                    hint = base.defer(attr)
                 else:
                     raise AssertionError("invalid op")
             elif isinstance(prop, RelationshipProperty):
-                # if joined_relationship:
-                #     hint = base.subqueryload(name)
-                # else:
-                #     hint = base.joinedload(name)
-                #     joined_relationship = True
-                hint = base.selectinload(name)
+                hint = base.selectinload(attr)
 
-                if 'children' in item:
-                    CatchallPredicate.get_hints(item['children'],
-                                                prop.entity, hint)
-            hints.append(hint)
-        return hints
+                if children:
+                    CatchallPredicate.get_hints(children, attr.entity,
+                                                hint, context=context)
+            ret.append(hint)
+        return ret
 
 
 # base class to decorate with a CatchAllPredicate
@@ -417,6 +429,8 @@ class CatchallView(CRUDView):
             self.key = self.request.matchdict['pkey']
         if 'hints' in self.request.matchdict:
             self.hints = self.request.matchdict['hints']
+        else:
+            self.hints = []
 
     @property
     def identity_filter(self):

@@ -1,7 +1,15 @@
 from abc import ABC, abstractmethod
 
 
-class ChangeGuardProvider(ABC):
+class JsonGuardProvider(ABC):
     @abstractmethod
-    def guard(self, obj, data, for_update=True):
+    def guardUpdate(self, obj, data, for_update=True):
+        pass
+
+    @abstractmethod
+    def guardHints(self, cls, hints):
+        pass
+
+    @abstractmethod
+    def guardSerialize(self, obj, value):
         pass
