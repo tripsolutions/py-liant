@@ -13,3 +13,7 @@ class JsonGuardProvider(ABC):
     @abstractmethod
     def guardSerialize(self, obj, value):
         pass
+
+    @abstractmethod
+    def guardDrilldown(self, prop):
+        pass

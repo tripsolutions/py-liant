@@ -1,10 +1,12 @@
+from pyparsing import ParseException
 from pyramid.request import Request
 from pyramid.httpexceptions import (
     HTTPNotFound, HTTPServerError, HTTPConflict, HTTPOk)
 from sqlalchemy.orm.util import AliasedClass
-from sqlalchemy.orm.exc import NoResultFound, StaleDataError
+from sqlalchemy.orm.exc import (NoResultFound, StaleDataError)
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm.base import NOT_EXTENSION
-from sqlalchemy.orm import ColumnProperty, RelationshipProperty
+from sqlalchemy.orm import ColumnProperty, RelationshipProperty, Mapper
 from sqlalchemy import String, orm, and_
 from sqlalchemy.inspection import inspect
 import transaction
@@ -13,7 +15,7 @@ import transaction
 from .json_encoder import JSONEncoder
 from .json_decoder import JSONDecoder
 from .monkeypatch import coerce_value
-from .hints_parser import hints_parser
+from .parser import route_parser
 from .interfaces import JsonGuardProvider
 
 
@@ -104,6 +106,9 @@ class CRUDView(object):
     def context_filter(self):
         return True
 
+    def get_one_from_query(self, query):
+        return query.filter(self.context_filter, self.identity_filter).one()
+
     def get_by_id(self, update_lock=False):
         try:
             query = self.get_identity_base()
@@ -116,8 +121,7 @@ class CRUDView(object):
                     query = query.with_for_update(of=self.target_type)
                 else:
                     query = query.with_for_update()
-            return query.filter(self.context_filter, self.identity_filter) \
-                .one()
+            return self.get_one_from_query(query)
         except NoResultFound:
             raise HTTPNotFound()
 
@@ -141,7 +145,7 @@ class CRUDView(object):
     @property
     def order_clauses(self):
         if 'order' not in self.request.GET or self.request.GET['order'] == "":
-            return [False]
+            return None
         orders = [(item[:-5], True) if item.endswith(' desc')
                   else(item, False)
                   for item in self.request.GET['order'].split(",")]
@@ -192,9 +196,12 @@ class CRUDView(object):
             query = query.subquery()
             self.accept_order = dict(query.c)
             query = self.request.dbsession.query(
-                *query.c).order_by(*self.order_clauses)
-        else:
-            query = query.order_by(*self.order_clauses)
+                *query.c)
+
+        order_clauses = self.order_clauses
+        if order_clauses is not None:
+            # reset and apply order_by
+            query = query.order_by(None).order_by(*order_clauses)
         return query[pager] if pager else query.all(), count
 
     def get(self):
@@ -304,6 +311,26 @@ class ConvertMatchdictPredicate:
         return True
 
 
+def _get_assert_one(q):
+    return q.one()
+
+
+def _get_by_pkey(pkey):
+    def _impl(q):
+        return q.get(pkey)
+    return _impl
+
+
+# TODO: reverse order for negative indexes (?)
+def _get_by_index(index):
+    def _impl(q):
+        ret = q[index:index + 1]
+        if len(ret) == 0:
+            raise NoResultFound()
+        return ret[0]
+    return _impl
+
+
 class CatchallPredicate:
     def __init__(self, targets, config):
         def _adapt(obj):
@@ -324,41 +351,96 @@ class CatchallPredicate:
         match = request.matchdict
 
         # convert target to type
-        if 'target' not in match:
+        if 'catchall' not in match:
             return False
 
-        if match['target'] not in self.targets:
+        try:
+            route = route_parser.parseString(match['catchall'], True)
+        except ParseException:
             return False
 
-        target_attrs = self.targets[match['target']]
+        if route['verb'] not in self.targets:
+            return False
 
-        match['target'] = target_attrs[0]
+        target = self.targets[route['verb']][0]
+        getter = None
 
-        insp = inspect(target_attrs[0])
+        insp = inspect(target)
+        query = request.dbsession.query(target)
 
         # convert pkey
-        if 'pkey' in match:
-            pkey = match['pkey'].split(',')
+        if 'pkey' in route:
+            pkey = route['pkey']
             if len(pkey) != len(insp.primary_key):
                 return False
-
             try:
-                pkey = [col == coerce_value(match['target'], col, val)
-                        for col, val in zip(insp.primary_key, pkey)]
+                pkey = tuple(coerce_value(target, col, val)
+                             for col, val in zip(insp.primary_key, pkey))
             except ValueError:
                 return False
+            getter = _get_by_pkey(pkey)
 
-            match['pkey'] = pkey
+        if 'drilldown' in route:
+            # cannot drilldown property if result is list
+            if getter is None:
+                return False
+
+            drilldown = route['drilldown']
+            try:
+                prop = insp.get_property(drilldown)
+            except InvalidRequestError:
+                return False
+
+            if isinstance(context, JsonGuardProvider):
+                if not context.guardDrilldown(prop.class_attribute):
+                    return False
+
+            if not isinstance(prop, RelationshipProperty):
+                return False
+
+            # target switch in drilldown
+            target = prop.entity.class_
+
+            if prop.lazy == 'dynamic':
+                # special drilldown love for dynamic props
+                query = getattr(getter(query), prop.key)
+                # getter no longer useful
+                getter = None
+            else:
+                # manually construct drilldown query for non-dynamic props
+                pkey_filter = (col == val for col, val in
+                               zip(insp.primary_key, pkey))
+                query = request.dbsession.query(prop.entity) \
+                    .select_from(prop.parent) \
+                    .join(prop.class_attribute) \
+                    .filter(and_(*pkey_filter))
+
+            if not prop.uselist:
+                # target is single item fk
+                getter = _get_assert_one
+
+        if 'slice' in route:
+            # cannot slice if pkey or single item drilldown encountered
+            if getter is not None:
+                return False
+
+            slicer = route['slice']
+            if 'index' in slicer:
+                getter = _get_by_index(int(slicer['index']))
+            else:
+                match['slicer'] = slicer
+
         # decode hints
-        if 'hints' in match:
-            match['hints'] = self.get_hints(match['hints'], match['target'],
-                                            context=context)
-        else:
-            match['hints'] = (self.get_hints(target_attrs[1], match['target'],
-                                             context=context)
-                              if len(target_attrs) > 1 and target_attrs[1]
-                              else self.get_hints("", match['target'],
-                                                  context=context))
+        if 'hints' in route:
+            try:
+                hints = self.get_hints(route['hints'], target,
+                                       context=context)
+                query = query.options(*hints)
+            except AssertionError:
+                return False
+
+        match['query'] = query
+        match['getter'] = getter
 
         return True
 
@@ -374,13 +456,14 @@ class CatchallPredicate:
         #   eager load collection (-x marks subquery laod preference);
         #   hints in parantheses recursively apply to elements of
         #   the collection
-        if type(value) is str:
-            if len(value):
-                value = hints_parser.parseString(value, True)
-            else:
-                value = []
 
-        insp = inspect(cls)
+        if type(cls) is Mapper:
+            # caller passed us a mapper (drilldown)
+            insp = cls
+            cls = insp.class_
+        else:
+            insp = inspect(cls)
+
         hints = {}
         for item in value:
             name = item['name']
@@ -414,36 +497,51 @@ class CatchallPredicate:
 class CatchallView(CRUDView):
     context = None
     request = None
-    hints = None
+    query = None
+    getter = None
+    slicer = None
 
     def __init__(self, request):
         super().__init__(request)
+        self.query = self.request.matchdict['query']
+        self.getter = self.request.matchdict.get('getter')
 
-        self.target_type = self.request.matchdict['target']
-        self.target_name = self.target_type.__tablename__
+        self.target_type = self.query.column_descriptions[0]['type']
+        self.target_name = self.target_type.__table__.name
+        self.slicer = self.request.matchdict.get('slicer')
 
         self.filters = self.auto_filters(target=self.target_type)
         self.accept_order = self.auto_order(target=self.target_type)
 
-        if 'pkey' in self.request.matchdict:
-            self.key = self.request.matchdict['pkey']
-        if 'hints' in self.request.matchdict:
-            self.hints = self.request.matchdict['hints']
-        else:
-            self.hints = []
+    def get_base_query(self):
+        return self.query
+
+    def get_one_from_query(self, query):
+        if self.getter is None:
+            raise HTTPNotFound()
+        order_clauses = self.order_clauses
+        if order_clauses is not None:
+            query = query.order_by(None).order_by(*order_clauses)
+        return self.getter(query)
+
+    def process(self):
+        if self.request.method == 'GET':
+            if self.getter is not None:
+                return self.get()
+            return self.list()
+        elif self.request.method == 'POST':
+            if self.getter is not None:
+                return self.update()
+            return self.insert()
+        elif self.request.method == 'DELETE':
+            if self.getter is None:
+                raise HTTPNotFound()
+            return self.delete()
+        raise HTTPNotFound()
 
     @property
-    def identity_filter(self):
-        return and_(*self.key)
-
-    def get_identity_base(self):
-        query = self.get_base_query()
-        if self.hints and len(self.hints):
-            query = query.options(*self.hints)
-        return query
-
-    def get_list_base(self):
-        query = self.get_base_query()
-        if self.hints and len(self.hints):
-            query = query.options(*self.hints)
-        return query
+    def pager_slice(self):
+        if self.slicer is not None:
+            return slice(int(self.slicer['start']),
+                         int(self.slicer['stop']))
+        return super().pager_slice

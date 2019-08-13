@@ -8,7 +8,7 @@ from sqlalchemy.orm import (
     Mapper, Session)
 from collections import OrderedDict
 from decimal import Decimal
-from distutils.util import strtobool
+from pyramid.settings import asbool
 from datetime import date, time, datetime
 from dateutil import parser, tz
 from enum import Enum
@@ -25,7 +25,6 @@ def coerce_value(cls, column, value, size_check=True):
                 f'{cls!r}')
         return None
 
-    print(cls, column, value, size_check, column.type)
     try:
         python_type = column.type.python_type
     except NotImplementedError:
@@ -84,7 +83,7 @@ def coerce_value(cls, column, value, size_check=True):
     if python_type is bool and value is not None and type(value) is not bool:
         try:
             if type(value) is str:
-                value = bool(strtobool(value))
+                value = asbool(value)
             elif type(value) is int:
                 if value not in [0, 1]:
                     raise ValueError

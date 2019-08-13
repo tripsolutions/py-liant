@@ -27,7 +27,6 @@ class SearchPathSetter(PoolListener):
             search_path.append('public')
         cursor = dbapi_con.cursor()
         statement = "SET search_path TO %s;" % ', '.join(search_path)
-        print(statement)
         sa_logger.info(statement)
         cursor.execute(statement)
         dbapi_con.commit()
