@@ -16,11 +16,12 @@ class JSONEncoder(simplejson.JSONEncoder):
     request = None
     obj_index = None
     base_type = None
+    counter = 0
 
     def __init__(self, request=None, base_type=None, **kwargs):
         super().__init__(encoding=None, **kwargs)
         self.request = request
-        self.obj_index = set()
+        self.obj_index = dict()
         self.base_type = base_type
 
     def default(self, o):
@@ -52,21 +53,14 @@ class JSONEncoder(simplejson.JSONEncoder):
 
             pk = mapper.primary_key_from_instance(o)
             pk_index = (type(o),) + tuple(pk)
-            if all([val is None for val in pk]):
-                pk_str = None
-            else:
-                json_type = getattr(type(o), '__json_name__', type(o).__name__)
-                pk_str = json_type + ':' + ','.join([str(col) for col in pk])
+            if not all([val is None for val in pk]):
                 if pk_index in self.obj_index:
-                    return dict(_ref=pk_str)
-
-            self.obj_index.add(pk_index)
+                    referred = self.obj_index[pk_index]
+                    return dict(_ref=referred._id)
 
             # making sure all paths are explicitly loaded eliminates most of
             # the pressure to provide JSON hints at runtime; instead make sure
             # all relevant paths are loaded
-            # TODO: investigate how to improve selection criteria or
-            # TODO:   modularize them
             ret = JsonObject({
                 key: getattr(o, key)
                 for key, value in mapper.all_orm_descriptors.items()
@@ -76,7 +70,9 @@ class JSONEncoder(simplejson.JSONEncoder):
                 and (not hasattr(value, 'property')
                      or value.property not in composite_props)
             })
-            ret.update(_id=pk_str)
+            self.counter += 1
+            ret._id = self.counter
+            self.obj_index[pk_index] = ret
             if self.request is not None and isinstance(self.request.context,
                                                        JsonGuardProvider):
                 self.request.context.guardSerialize(o, ret)
