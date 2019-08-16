@@ -14,7 +14,7 @@ import transaction
 
 from .json_encoder import JSONEncoder
 from .json_decoder import JSONDecoder
-from .monkeypatch import coerce_value
+from .monkeypatch import coerce_value, patch_sqlalchemy_base_class
 from .parser import route_parser
 from .interfaces import JsonGuardProvider
 
@@ -24,7 +24,7 @@ from .interfaces import JsonGuardProvider
 # Sample usage:
 #     config.add_renderer('json', pyramid_json_renderer_factory(Base))
 
-def pyramid_json_renderer_factory(base_type=None, stream_method=2,
+def pyramid_json_renderer_factory(base_type=None, wsgi_iter=False,
                                   separators=(',', ':')):
     def _json_renderer(info):
         def _render(value, system):
@@ -40,7 +40,7 @@ def pyramid_json_renderer_factory(base_type=None, stream_method=2,
                                            check_circular=False)
 
                 # solution 1: write to stream from renderer
-                if stream_method == 0:
+                if not wsgi_iter:
                     for chunk in json_encoder.iterencode(value):
                         response.write(chunk)
                     return None
@@ -519,6 +519,7 @@ class CatchallView(CRUDView):
     def get_one_from_query(self, query):
         if self.getter is None:
             raise HTTPNotFound()
+        query = query.filter(*self.query_filters)
         order_clauses = self.order_clauses
         if order_clauses is not None:
             query = query.order_by(None).order_by(*order_clauses)
@@ -545,3 +546,23 @@ class CatchallView(CRUDView):
             return slice(int(self.slicer['start']),
                          int(self.slicer['stop']))
         return super().pager_slice
+
+
+def includeme_factory(base_class=None, config_json=True, add_predicates=True,
+                      wsgi_iter=False, separators=(',', ':')):
+    def includeme(config):
+        if config_json and base_class is not None:
+            config.add_renderer(
+                'json',
+                pyramid_json_renderer_factory(
+                    base_class, wsgi_iter=wsgi_iter,
+                    separators=separators))
+            config.add_request_method(pyramid_json_decoder, 'json', reify=True)
+        if add_predicates:
+            config.add_view_predicate(
+                'convert_matchdict', ConvertMatchdictPredicate)
+            config.add_view_predicate('catchall', CatchallPredicate)
+        if base_class is not None:
+            patch_sqlalchemy_base_class(base_class)
+
+    return includeme
