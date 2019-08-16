@@ -1,3 +1,28 @@
+- [Introduction](#introduction)
+  - [RESTful API](#restful-api)
+  - [Opinionated](#opinionated)
+  - [Modified JSON](#modified-json)
+- [How to use](#how-to-use)
+- [Reference](#reference)
+  - [JsonObject](#jsonobject)
+  - [JSONEncoder](#jsonencoder)
+  - [JSONDecoder](#jsondecoder)
+  - [pyramid_json_renderer_factory](#pyramidjsonrendererfactory)
+  - [pyramid_json_decoder](#pyramidjsondecoder)
+  - [patch_sqlalchemy_base_class](#patchsqlalchemybaseclass)
+  - [monkeypatch: obj.apply_changes](#monkeypatch-objapplychanges)
+  - [CRUDView](#crudview)
+  - [ConvertMatchdictPredicate](#convertmatchdictpredicate)
+  - [CatchallPredicate](#catchallpredicate)
+  - [CatchallView](#catchallview)
+    - [Hints syntax](#hints-syntax)
+    - [Drilldown support](#drilldown-support)
+    - [Single element from collection](#single-element-from-collection)
+    - [Filtering, sorting, pagination](#filtering-sorting-pagination)
+  - [JsonGuardProvider](#jsonguardprovider)
+  - [SearchPathSetter](#searchpathsetter)
+  - [EnumAttrs and PythonEnum](#enumattrs-and-pythonenum)
+
 # Introduction
 
 Py-liant is a library of helpers for rapid creation of opinionated RESTful APIs
