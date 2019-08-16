@@ -2,12 +2,11 @@ import re
 from sqlalchemy.types import SchemaType, TypeDecorator, Enum
 
 
-def EnumAttrs(name, schema=None, json_use_values=False):
+def EnumAttrs(name, schema=None):
     def f(cls):
         if schema is not None:
             cls.__db_schema = schema
         cls.__db_name = name
-        cls._json_use_values = json_use_values
         return cls
     return f
 
