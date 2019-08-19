@@ -80,6 +80,11 @@ class UploadCommand(Command):
         sys.exit()
 
 
+tests_require = [
+    'pytest >= 3.7.4',
+    'pytest-cov',
+]
+
 # Where the magic happens:
 setup(
     name=NAME,
@@ -97,6 +102,7 @@ setup(
     # entry_points={
     #     'console_scripts': ['mycli=mymodule:cli'],
     # },
+    tests_require=tests_require,
     install_requires=REQUIRED,
     include_package_data=True,
     license='MIT',

@@ -28,7 +28,7 @@ class JSONDecoder(simplejson.JSONDecoder):
 
             if _id in self.resolved:
                 raise AssertionError(
-                    'two objects with the same _id in payload: ' + _id)
+                    f'two objects with the same _id in payload: {_id}')
 
             if _id in self.unresolved:
                 ret = self.unresolved[_id]
@@ -45,7 +45,8 @@ class JSONDecoder(simplejson.JSONDecoder):
     def decode(self, s, *args, **kwargs):
         ret = super().decode(s, *args, **kwargs)
         if self.unresolved:
-            raise AssertionError('Unresolved references: ' +
-                                 ", ".join(self.unresolved.keys()))
+            raise AssertionError(
+                'Unresolved references: ' +
+                ", ".join([str(i) for i in self.unresolved.keys()]))
         self.resolved.clear()
         return ret
