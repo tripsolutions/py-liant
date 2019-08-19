@@ -30,7 +30,7 @@ using pyramid and SQLAlchemy. It provides a read-write set of operations using
 a slightly modified object-graph aware JSON structure which is tightly coupled
 with the data models being exposed.
 
-It was created by Trip Solutions for internal projects but we feel it may prove 
+It was created by Trip Solutions for internal projects but we feel it may prove
 useful for general consumption.
 
 ## RESTful API
@@ -43,9 +43,9 @@ the payloads, see [Modified JSON](#modified-json) and [CrudView](#crudview)
 
 ## Opinionated
 
-The [CatchallView](#catchallview) base class however provides a custom parser 
-for the URL string and is heavily opinionated about the structure of the API. 
-This allows it to be effortlessly deployed on top of existing SQLAlchemy data 
+The [CatchallView](#catchallview) base class however provides a custom parser
+for the URL string and is heavily opinionated about the structure of the API.
+This allows it to be effortlessly deployed on top of existing SQLAlchemy data
 structures but has the disadvantage of being less customizable.
 
 ## Modified JSON
@@ -66,6 +66,7 @@ to an object are codified using an object with a sigle key `_ref` matching the
 model objects.
 
 For example, given the model declaration below:
+
 ```python
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy import Column, Integer, Text, ForeignKey
@@ -135,8 +136,8 @@ properties, which means it will not display any non-SQLAlchemy properties. It
 also expects all relationships to be eagerly loaded and will avoid triggering
 any lazy-loaded properties. Deferred columns are also avoided.
 
-Conversely, the [JSONDecoder](#jsondecoder) will turn a simlarly codified JSON 
-structure and return a completed graph, with potentially cyclic or multiple 
+Conversely, the [JSONDecoder](#jsondecoder) will turn a simlarly codified JSON
+structure and return a completed graph, with potentially cyclic or multiple
 references, for use in the application.
 
 The decoder will generate a structure of [JsonObject](#jsonobject)s. If the base
@@ -205,22 +206,26 @@ notation (`request.json['prop']` becomes `request.json.prop`). The
 ## JSONEncoder
 
 A `simplejson.JSONEncoder` implementation that adds the following:
+
 - converts `date`, `time` and `datetime` objects to ISO8859 strings
 - converts `byte` values to Base64
 - strigifies python `Enum` values to their name, `uuid.UUID` values
 - tracks SQLAlchemy models (if provided a base class) as discussed in [Modified JSON](#modified-json)
   
 Constructor arguments:
+
 ```python
 JSONDecoder(request=None, base_type=None, **kwargs)
 ```
-`request` should be a pyramid request object. If provided it's used to apply 
+
+`request` should be a pyramid request object. If provided it's used to apply
 [JsonGuardProvider](#jsonguardprovider) fencing for serialization.
 
 `base_type` is the SQLAlchemy models base class. If not provided the
 functionality related to SQLAlchemy is disabled.
 
 `kwargs` is passed to `simplejson.JSONEncoder`'s constructor
+
 ## JSONDecoder
 
 A `simplejson.JSONDecoder` implementation that returns a
@@ -228,6 +233,7 @@ A `simplejson.JSONDecoder` implementation that returns a
 described in [Modified JSON](#modified-json).
 
 Constructor argumets:
+
 ```python
 JSONDecoder(**kwargs)
 ```
@@ -240,8 +246,9 @@ Factory for a pyramid renderer that provides JSON serialization using
 [JSONEncoder](#jsonencoder). See [How to use](#how-to-use) for usage.
 
 Arguments:
+
 ```python
-pyramid_json_renderer_factory(base_type=None, wsgi_iter=False, 
+pyramid_json_renderer_factory(base_type=None, wsgi_iter=False,
                               separators=(',',':'))
 ```
 
@@ -252,7 +259,7 @@ size by skipping any unnecessary spaces.
 `wsgi_iter` can be used to optimize rendering of JSON by passing an iterable
 directly to the WSGI layer. By default the renderer writes directly in the
 pyramid `response` object. When activated pyramid can no longer handle error
-redirects for execptions thrown during serialization. 
+redirects for execptions thrown during serialization.
 
 ## pyramid_json_decoder
 
@@ -323,7 +330,7 @@ class ParentView(CRUDView):
         super().__init__(request)
         self.filters = self.auto_filters()
         self.accept_order = self.auto_order()
-    
+
     def identity_filter(self):
         return Parent.id == int(self.request.matchdict('id'))
 ```
@@ -332,7 +339,7 @@ This is enough to provide a complete read-write endpoint for objects of type
 `Parent`.
 
 Use `GET /parent/1 HTTP/1.1` to retrieve parent with id=1. It should return
-something along the lines of: 
+something along the lines of:
 
 ```json
 {
@@ -343,8 +350,10 @@ something along the lines of:
   }
 }
 ```
-Use  
-```
+
+Use
+
+```http
 POST /parent/1 HTTP/1.1
 
 {
@@ -362,7 +371,7 @@ of updating an existing one.
 `DELETE /parent/2 HTTP/1.1` will delete the parent with id=2.
 
 Finally, `GET /parent HTTP/1.1` will provide a list of all parent instances in
-the database. 
+the database.
 
 For the listing endpoint the following response will be returned:
 
@@ -488,13 +497,14 @@ exception.
 
 This is a supporting predicate to be used with [CatchallView](#catchallview). It
 assumes the route contains a fizzle parameter of the form `{catchall:.*}` (NOT
-`*catchall`}, since the star format creates an array of string values from the
+`*catchall`, since the star format creates an array of string values from the
 match) that is then parsed internally and converted to values better suited for the [CatchallView](#catchallview) class.
 
 ## CatchallView
 
 This is an extension of the [CrudView](#crudview) class that adds support for a
 far richer route format based on internal parsing done by the [CatchallPredicate](#catchallpredicate) and has the ability to:
+
 - expose multiple entity types in a single place
 - offer arbitrary eager loading depth, as specified in the route's loading hints
 - drill into both dynamic and static relationships
@@ -517,7 +527,8 @@ class MyCatchallView(CatchallView):
     pass
 ```
 
-This code is enough to expose routes such as: 
+This code is enough to expose routes such as:
+
 - `GET /parent` or `GET /child` to list all parents or children
 - `GET /parent@1` or `GET /child@1` to get parent with id=1 or child with id=1
 - `POST /parent` or `POST /child` to add a new parent
@@ -526,7 +537,7 @@ This code is enough to expose routes such as:
   id=1
 
 In other words, both entity types `Parent` and `Child` are accessible from a
-single point. 
+single point.
 
 ### Hints syntax
 
@@ -549,7 +560,8 @@ If we also added a `blob` column for the `Child` entity (let's assume it's a
 deferred column in the code), the caller can get a parent with all children
 including the blob for each by calling `GET /parent@1:*children(+blob)`.
 Multiple hints can be provided by comma separating them. This is also the case
-for relationship hints: 
+for relationship hints:
+
 - `GET /parent@1:-blob,*children` means "load `Parent` with all `children`
   included and defer loading the column `Parent.blob`".
 - `GET /parent@1:-blob,*children(+blob,-blob2,*second_parent)` means "load `Parent`
@@ -582,7 +594,7 @@ entities in the relationship being drilled down into. For example in the request
 `Child.blob`.
 
 If the property being drilled into is a collection all [Filtering, sorting and
-pagination](#filtering-sorting-pagination) considerations apply. 
+pagination](#filtering-sorting-pagination) considerations apply.
 
 ### Single element from collection
 
@@ -615,14 +627,15 @@ insert/update method](#monkeypatch-objapplychanges)).
 
 The `JsonGuardProvider` interface allows you to add security fencing for four
 areas:
+
 - method `guardSerialize` allows you to control how much information gets
   serialized to JSON
 - method `guardUpdate` allows you to control what can be written into the
   entities whenever `obj.apply_changes()` get called
 - method `guardHints` allows you to control what [CatchallView
   hints](#hints-syntax) are permitted
-- method `guardDrilldown` allows you to control what properties can be 
-- [drilled down](#drilldown-support) into via `CatchallView`
+- method `guardDrilldown` allows you to control what properties can be
+  [drilled down](#drilldown-support) into via `CatchallView`
 
 To use a `JsonGuardProvider` implement this interface in a Pyramid
 [context](https://docs.pylonsproject.org/projects/pyramid/en/latest/narr/urldispatch.html#route-factories)
@@ -666,7 +679,7 @@ class MyContext(JsonGuardProvider):
                 del data.property
 
         # or apply mandatory changes to certain objects
-        # TrackedInstanceMixin could be a mixin that adds 'added' and 
+        # TrackedInstanceMixin could be a mixin that adds 'added' and
         # 'last_updated' columns to entities
         if isinstance(obj, TrackedInstanceMixin):
             # for_update is set to true when obj is newly instantiated
@@ -674,7 +687,7 @@ class MyContext(JsonGuardProvider):
                 obj.added = datetime.now(timezone.utc)
             obj.last_updated = datetime.now(timezone.utc)
 
-        # if returning falsey value processing for this entity and all 
+        # if returning falsey value processing for this entity and all
         # descendants is prevented
         return True
 
@@ -684,11 +697,11 @@ class MyContext(JsonGuardProvider):
         # e.g. remove any hint for Parent.data
         if cls is Parent and Parent.data in hints:
             del hints[Parent.data]
-        
+
         # or add default hints for certain classes
         if cls is Child and Child.data not in hints:
             hints[Child.data] = ('-', None)
-        
+
         if cls is Child and Child.parent not in hints:
             hints[Child.parent] = ('*', [('+', Parent.blob)])
 
