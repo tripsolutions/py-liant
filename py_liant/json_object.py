@@ -22,6 +22,8 @@ class JsonObject(dict):
 
 
 class JsonOrderedObject(OrderedDict):
+    # same as JsonObject but based on OrderedDict, useful to get predictable
+    # results during testing
 
     def __getattr__(self, item):
         if item not in self:
