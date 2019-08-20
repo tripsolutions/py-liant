@@ -3,8 +3,9 @@
 from sqlalchemy import (
     engine_from_config, Column,
     ForeignKey,
-    Integer, Text
+    Integer, Text, DateTime, Interval, BLOB
 )
+from py_liant.enum import PythonEnum
 from sqlalchemy.orm import (
     sessionmaker, configure_mappers,
     relationship, backref
@@ -12,6 +13,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.schema import MetaData
 import zope.sqlalchemy
+from enum import Enum
 
 
 class BaseBase:
@@ -27,9 +29,19 @@ metadata = MetaData()
 Base = declarative_base(metadata=metadata, cls=BaseBase)
 
 
+class ParentType(Enum):
+    type1 = 'type1'
+    type2 = 'type2'
+    type3 = 'type3'
+
+
 class Parent(Base):
     id = Column(Integer, primary_key=True)
-    data = Column(Text)
+    data1 = Column(Text)
+    data2 = Column(DateTime)
+    data3 = Column(Interval)
+    data4 = Column(BLOB)
+    data5 = Column(PythonEnum(ParentType))
 
 
 class Child(Base):

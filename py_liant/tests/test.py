@@ -38,7 +38,7 @@ class EngineTest(unittest.TestCase):
         Base.metadata.drop_all(self.engine)
 
 
-class TestJsonEncoder(EngineTest):
+class TestJsonEncoderDecoder(EngineTest):
 
     expected_json = '''\
 {
@@ -53,7 +53,11 @@ class TestJsonEncoder(EngineTest):
             "_id": 2
         }
     ],
-    "data": "parent value",
+    "data1": "parent value",
+    "data2": "2000-01-01T00:00:00",
+    "data3": "P1DT7H12M",
+    "data4": "dGVzdA==",
+    "data5": "type1",
     "id": 1,
     "_id": 1
 }'''
@@ -68,8 +72,36 @@ class TestJsonEncoder(EngineTest):
             "_id": 2
         }
     ],
-    "data": "parent value",
+    "data1": "parent value",
+    "data2": "2000-01-01T00:00:00",
+    "data3": "P1DT7H12M",
+    "data4": "dGVzdA==",
+    "data5": "type1",
     "id": 1,
+    "_id": 1
+}'''
+
+    json_to_decode = '''\
+{
+    "children": [
+        {
+            "data": "child value",
+            "id": 1,
+            "parent": {
+                "_ref": 1
+            },
+            "parent_id": 1,
+            "_id": 2
+        }
+    ],
+    "other_collection": [
+        {"_ref": "custom"},
+        {"_ref": 1},
+        {
+            "_id": "custom",
+            "data": "custom object data"
+        }
+    ],
     "_id": 1
 }'''
 
@@ -77,17 +109,24 @@ class TestJsonEncoder(EngineTest):
         super().setUp()
         self.init_database()
 
-        from ..tests.models import Parent, Child
-        parent = Parent(data='parent value')
+        from ..tests.models import Parent, Child, ParentType
+        from datetime import datetime, timedelta
+        parent = Parent(data1='parent value',
+                        data2=datetime(2000, 1, 1, 0, 0, 0),
+                        data3=timedelta(days=1.3),
+                        data4=b'test',
+                        data5=ParentType.type1)
         parent.children.append(Child(data='child value'))
         self.session.add(parent)
 
     def test_json_serialization(self):
         from py_liant.json_encoder import JSONEncoder
         from ..tests.models import Base, Parent
+        from sqlalchemy.orm import joinedload
         encoder = JSONEncoder(base_type=Base, check_circular=False,
                               indent=4 * ' ', sort=True)
-        obj = self.session.query(Parent).get(1)
+        obj = self.session.query(Parent).options(
+            joinedload(Parent.children)).get(1)
         info = encoder.encode(obj)
         self.assertMultiLineEqual(info, self.expected_json,
                                   "JSON encoded correctly")
@@ -96,7 +135,7 @@ class TestJsonEncoder(EngineTest):
         from py_liant.json_decoder import JSONDecoder
         from py_liant.json_object import JsonObject
         decoder = JSONDecoder()
-        obj = decoder.decode(self.expected_json)
+        obj = decoder.decode(self.json_to_decode)
         self.assertIsNotNone(obj, "JSON decoded successfully")
         self.assertIsInstance(obj, JsonObject,
                               "expected JsonObject from decoder")
@@ -105,9 +144,18 @@ class TestJsonEncoder(EngineTest):
         self.assertEqual(len(obj.children), 1, "expected one child")
         self.assertIs(obj.children[0].parent, obj,
                       "child's parent loops back on object")
+        self.assertEqual(len(obj.other_collection), 3,
+                         "other collection size check")
+        custom_obj = obj.other_collection[0]
+        self.assertEqual(custom_obj.data, "custom object data",
+                         "check data in custom object")
+        self.assertIs(
+            obj.other_collection[2], custom_obj,
+            "reference check custom object inverse/delayed resolution")
 
     # JSON serialization test after parent expunged;
     # we're join-loading children but parent should not show up anymore
+
     def test_json_serialization_after_expunge(self):
         from py_liant.json_encoder import JSONEncoder
         from ..tests.models import Base, Parent
@@ -137,14 +185,29 @@ class TestJsonEncoder(EngineTest):
             AssertionError, "two objects with the same _id", decoder.decode,
             '{"items": [{"_id": 1}, {"_id": 1}]}')
 
+    def test_json_uuid_value(self):
+        from py_liant.json_encoder import JSONEncoder
+        import uuid
+        encoder = JSONEncoder()
+        info = encoder.encode({'uuid': uuid.uuid5(uuid.NAMESPACE_DNS,
+                                                  "test.com")})
+        self.assertEqual(
+            info, '{"uuid": "1c39b279-6010-55d9-b677-859bffab8081"}',
+            "check UUID encoding")
+
 
 class TestApplyChanges(EngineTest):
     def setUp(self):
         super().setUp()
         self.init_database()
 
-        from ..tests.models import Parent, Child
-        parent = Parent(data='parent value')
+        from ..tests.models import Parent, Child, ParentType
+        from datetime import datetime, timedelta
+        parent = Parent(data1='parent value',
+                        data2=datetime(2000, 1, 1, 0, 0, 0),
+                        data3=timedelta(days=1.3),
+                        data4=b'test',
+                        data5=ParentType.type1)
         parent.children.append(Child(data='child value'))
         self.session.add(parent)
 
@@ -159,9 +222,9 @@ class TestApplyChanges(EngineTest):
         decoder = JSONDecoder()
 
         obj = self.session.query(Parent).get(1)
-        data = decoder.decode('''{"data": "changed value"}''')
+        data = decoder.decode('''{"data1": "changed value"}''')
         obj.apply_changes(data)
-        self.assertEqual(obj.data, "changed value",
+        self.assertEqual(obj.data1, "changed value",
                          "Parent.data correctly changed")
 
     def test_deep_property_change(self):
