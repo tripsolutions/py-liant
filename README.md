@@ -258,7 +258,7 @@ size by skipping any unnecessary spaces.
 
 `wsgi_iter` can be used to optimize rendering of JSON by passing an iterable
 directly to the WSGI layer. By default the renderer writes directly in the
-pyramid `response` object. When activated pyramid can no longer handle error
+pyramid `response` object. When activated, pyramid can no longer handle error
 redirects for execptions thrown during serialization.
 
 ## pyramid_json_decoder
@@ -278,20 +278,21 @@ obj.apply_changes(data, object_dict=None, context=None, for_update=True)
 ```
 
 Once SQLAlchemy's base class is patched using
-[patch_sqlalchemy_base_class](#patchsqlalchemybaseclass) all model instances get
+[patch_sqlalchemy_base_class](#patchsqlalchemybaseclass), all model instances get
 a method that can be used to apply patches. This can be used directly but most
 of the time, if you use [CRUDView](#crudview) and/or
 [CatchallView](#catchallview), you won't have to.
 
 The method will apply changes in any depth required. It converts the data types
 based on metadata extracted from SQLAlchemy. It handles relationships, both
-collections and instances, by tracking and comparing the primary keys provided in JSON. Where needed it will add new instances.
+collections and instances, by tracking and comparing the primary keys provided in JSON. 
+Where needed it will add new instances.
 
 For an object without relationships it applies the values from `data` to their
 corresponding column properties in `obj`. No property values are overwritten
 unless specified in the `data` object.
 
-If an object has relationships the `data` object can drill down into them. For
+If an object has relationships, the `data` object can drill down into them. For
 collection relationships the `apply_changes` method expects all objects to be
 provided in the corresponding array, at a minimum with their primary key
 present. If a member of the array does not provide a primary key it is presumed
@@ -299,7 +300,7 @@ to be a new instance. If a member of the object's collection cannot be tracked
 back to a member of the array in data, it will be removed from the collection.
 
 If the primary key of the descendants is a composite that includes any of the
-columns in the foreign key the caller can provide the partial primary key and
+columns in the foreign key, the caller can provide the partial primary key and
 py-liant will reconstruct the remaining columns based on the relatonship to the
 parent.
 
@@ -415,7 +416,8 @@ Sorting is done by using the GET parameter `order`, i.e. `GET
 list of sorting keys. Each sorting key also accepts the descending modifier,
 i.e. `order=data+desc,id`.
 
-Sorting and filtering keys can also be manually defined. In the usage example above we could have defined some filters and orderings by hand as such:
+Sorting and filtering keys can also be manually defined. 
+In the usage example above we could have defined some filters and orderings by hand as such:
 
 ```python
 class ParentView(CRUDView):
@@ -439,7 +441,7 @@ a SQLAlchemy database session valid for the model.
 ## ConvertMatchdictPredicate
 
 If pyramid has been configured to use this predicate as indicated in [How to
-use](#how-to-use) you can get around the need to convert matchdict parameters.
+use](#how-to-use), you can get around the need to convert matchdict parameters.
 
 Pyramid's [URL
 Dispatch](https://docs.pylonsproject.org/projects/pyramid/en/latest/narr/urldispatch.html#custom-route-predicates)
@@ -467,7 +469,7 @@ This code ensures both that the route will not match unless predicate executes
 succesfully (returns `True`) and that the view will see integer values for keys
 `year`, `month` and `day` in `request.matchdict`. While this is very useful it
 is unfortunately deprecated functionality. Sice pyramid-1.5 you will get a
-deprecation warnin when using `custom_predicates` in routes or views.
+deprecation warning when using `custom_predicates` in routes or views.
 
 To replace this functionality with supported mechanisms we've implemented a
 generic new-style route predicate class. To use this class in your routes you
@@ -541,7 +543,7 @@ single point.
 
 ### Hints syntax
 
-However from your application's perspective alllowing access to
+However, from your application's perspective alllowing access to
 `Child` at the root level might not be something useful, in other words you
 might want your API to regard `Child` as tightly bound to `Parent`. CatchallView
 allows you to get a parent entity and all children attached in one go using `GET
@@ -552,7 +554,7 @@ this case, it attaches a `selectinload(Parent.children)` option to the query.
 The hints will also allow you to hide properties that might be too large, by
 deferring them. I.e. if you added a `blob` property on `Parent` and the caller
 might want to avoid retrieving it, they could call `GET /parent@1:-blob`.
-Conversely, if the `blob` property is mared as a deferred column in the model
+Conversely, if the `blob` property is marked as a deferred column in the model
 declaration but the caller would want it included in the response they can
 undefer it by calling `GET /parent@1:+blob`.
 
@@ -589,7 +591,7 @@ The drilldown supports both normal relationship properties as well as dynamic
 relationship properties. It automatically determines if the target property is a
 list or a single entity (i.e. `GET /child@1/parent` also works). All hints
 provided must come after the drilldown specifier and they will refer to the
-entities in the relationship being drilled down into. For example in the request
+entities in the relationship being drilled down into. For example, in the request
 `GET /parent@1/children:+blob` the hint will defer loading of column
 `Child.blob`.
 
@@ -600,7 +602,7 @@ pagination](#filtering-sorting-pagination) considerations apply.
 
 If the request either refers to a collection property via
 [Drilldown](#drilldown-support) or refers to a collection of entities because it
-does not contain a primary key specifier the caller can select a single item
+does not contain a primary key specifier, the caller can select a single item
 from the list by using subscript notation. For example, `GET
 /parent@1/children[0]` will retrieve the first child of the `Parent.children`
 collection. [Filtering and sorting](#filtering-sorting-pagination) are applied
@@ -637,7 +639,7 @@ areas:
 - method `guardDrilldown` allows you to control what properties can be
   [drilled down](#drilldown-support) into via `CatchallView`
 
-To use a `JsonGuardProvider` implement this interface in a Pyramid
+To use a `JsonGuardProvider`, implement this interface in a Pyramid
 [context](https://docs.pylonsproject.org/projects/pyramid/en/latest/narr/urldispatch.html#route-factories)
 and attach it to the route and view using `add_route`'s `factory`.
 
