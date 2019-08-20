@@ -592,7 +592,7 @@ relationship properties. It automatically determines if the target property is a
 list or a single entity (i.e. `GET /child@1/parent` also works). All hints
 provided must come after the drilldown specifier and they will refer to the
 entities in the relationship being drilled down into. For example, in the request
-`GET /parent@1/children:+blob` the hint will defer loading of column
+`GET /parent@1/children:+blob` the hint will undefer loading of column
 `Child.blob`.
 
 If the property being drilled into is a collection all [Filtering, sorting and
