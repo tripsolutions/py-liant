@@ -215,7 +215,7 @@ A `simplejson.JSONEncoder` implementation that adds the following:
 Constructor arguments:
 
 ```python
-JSONDecoder(request=None, base_type=None, **kwargs)
+JSONEncoder(request=None, base_type=None, **kwargs)
 ```
 
 `request` should be a pyramid request object. If provided it's used to apply
