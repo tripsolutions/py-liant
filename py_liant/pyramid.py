@@ -9,6 +9,7 @@ from sqlalchemy.orm.base import NOT_EXTENSION
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty, Mapper
 from sqlalchemy import String, orm, and_
 from sqlalchemy.inspection import inspect
+from pyramid.settings import asbool
 import transaction
 
 
@@ -272,6 +273,9 @@ class CRUDView(object):
                 lambda x, attr=item: attr < coerce_func(x, attr)
             ret[f'{key}_le'] = \
                 lambda x, attr=item: attr <= coerce_func(x, attr)
+            ret[f'{key}_isnull'] = \
+                lambda x, attr=item: attr.is_(None) if asbool(x) else \
+                    attr.isnot(None)
         return ret
 
     @classmethod
@@ -414,6 +418,7 @@ class CatchallPredicate:
                     .select_from(prop.parent) \
                     .join(prop.class_attribute) \
                     .filter(and_(*pkey_filter))
+                getter = None
 
             if not prop.uselist:
                 # target is single item fk
