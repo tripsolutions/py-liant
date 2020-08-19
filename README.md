@@ -396,15 +396,15 @@ Pagination is supported via GET parameters `page` and `pageSize` (i.e., `GET
 /parent?page=3&pageSize=20`).
 
 Implicit filters and sorting are provided for all column properties. Assuming
-column properties `id` and `data` for class User, the following filters will be
+column properties `id` and `data` for class `User`, the following filters will be
 added to `self.filters` (in the example usage above, during construction, see
-the `auto_filters()` call): id, id_lt, id_le, id_gt, id_ge, data, data_lt,
-data_le, data_gt, data_ge, data_like. The filters [field_name]_[operator]
-provide filtering using the less-than, less-or-equal, greater-than,
-greater-or-equal and contains operators. The last one is automatically generated
-for string column properties only.
+the `auto_filters()` call): `id`, `id_lt`, `id_le`, `id_gt`, `id_ge`, `id_isnull`, `data`, `data_lt`,
+`data_le`, `data_gt`, `data_ge`, `data_like`, `data_isnull`. The filters `[field_name]_[operator]`
+provide filtering using the `less-than`, `less-or-equal`, `greater-than`,
+`greater-or-equal`, `contains` and `is-null` operators. The `contains` operator is automatically generated
+for string column properties only. The `is-null` operator accepts a boolean-like value and has the effect of applying the SQL `IS NULL` operator if given a truthy value and `IS NOT NULL` operator if given a falsey value.
 
-Automatic filters are also be added (in the example usage above see the call to
+Automatic sorting keys are also added (in the example usage above see the call to
 `auto_order()`) for both fields.
 
 Filtering in a listing endpoint is done as such: `GET /parent?data_like=object`.
@@ -618,6 +618,57 @@ Pagination as supported by [CRUDView](#crudview) is also supported however the
 same subscript notation as described in the previous section can be used for
 slicing: `GET /parent[0:10]?order_by=data+desc` retrieves the first 10 `Parent`
 entities in descending `data` order.
+
+### Polymorphic casting
+
+Suppose `Parent` is a polymorphic type defined similar to the following:
+
+```python
+class Parent(Base):
+    __tablename__ = 'parent'
+    id = Column(Integer, primary_key=True)
+    _type = Column('type', Text)
+    data = Column(Text)
+
+    __mapper_args__ = dict(
+        polyomrphic_on=_type
+    )
+```
+
+and derived classes defined as follows:
+
+```python
+class ParentFather(Parent):
+    __mapper_args__ = dict(
+        polymorphic_identity='father'
+    )
+class ParentMother(Parent):
+    __mapper_args__ = dict(
+        polymorphic_identity='mother'
+    )
+```
+
+If route `/parent` points to class `Parent` we can use polymorphic casting to access derived types; i.e. `/parent!father` will point to class `ParentFather` and `/parent!mother` will point to class `ParentMother`. The polymorphic casting syntax is `/<route>!<identity>` where `<identity>` refers to the `polymorphic_identity` value defined in each derived class' mapper arguments.
+
+Using the polymorphic casting syntax exposes all derived class' fields and relationships in the resulting JSON, exposes all fields to `auto_order` and `auto_filters` output, allows hints to refer to derived class` fields and relationships.
+
+Creating a derived class instance is also possible by performing a `POST /parent!<identity>`.
+
+### Polymorphic loading hints
+
+Sometimes you may want to access a collection like `/parent` without polymorphic casting to get acess to `Parent`s of all types but may wish to provide specific loading hints for each dervide type. Provided the derived classes had specific collections and fields (say, `father_data`, `mother_data` were relationships defined specifically for `ParentFather` and `ParentMother` respectively) they can be referred to in the loading hints as such:
+
+`/parent:!father(*father_data),!mother(*mother_data))`
+
+It's necessary to declare `with_polymorphic='*'` in the base class mapper arguments for the loading hints to take effect. At the moment py-liant does not offer a mechanism to force polymorphic loading when not defined in the mapper.
+
+Polymorphic loading hints can also be applied to relationships with polymorphic classes. Consider that `Child` was polymorphic and had `ChildGirl` and `ChildBoy` definitions with discrimiators set to the values `"girl"` and `"boy"`. Accessing the `children` collection of `Parent` would not normally allow you to specify loading hints for properties that were not generic. However you can use the following hints to specify eager loading for the derived class specific relationships:
+
+`/parent:*children(!boy(*boy_data),!girl(*girl_data))`
+
+### Polymorphic identity
+
+The identity value used in both types of polymorphic functionality described above is automatically cast to the polymorphic identifier type. In the examples above the type was string but any supported type can be used. [Enumerables](#enumattrs-and-pythonenum) are encouraged.
 
 ## JsonGuardProvider
 
