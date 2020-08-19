@@ -275,7 +275,7 @@ class CRUDView(object):
                 lambda x, attr=item: attr <= coerce_func(x, attr)
             ret[f'{key}_isnull'] = \
                 lambda x, attr=item: attr.is_(None) if asbool(x) else \
-                    attr.isnot(None)
+                attr.isnot(None)
         return ret
 
     @classmethod
@@ -370,6 +370,19 @@ class CatchallPredicate:
         getter = None
 
         insp = inspect(target)
+        if 'cast' in route:
+            if insp.polymorphic_on is None:
+                return False
+            try:
+                value = coerce_value(target, insp.polymorphic_on,
+                                     route['cast'])
+            except ValueError:
+                return False
+            if value not in insp.polymorphic_map:
+                return False
+            insp = insp.polymorphic_map[value]
+            target = insp.class_
+
         query = request.dbsession.query(target)
 
         # convert pkey
@@ -470,14 +483,33 @@ class CatchallPredicate:
             insp = inspect(cls)
 
         hints = {}
+        ret = []
         for item in value:
-            name = item['name']
             op = item['op']
+            if op == '!':
+                if insp.polymorphic_on is None:
+                    raise AssertionError("invalid cast")
+                try:
+                    _type = coerce_value(cls, insp.polymorphic_on,
+                                         item['type'])
+                except ValueError:
+                    raise AssertionError("invalid cast")
+                if _type not in insp.polymorphic_map:
+                    raise AssertionError("invalid cast")
+
+                ret.extend(
+                    CatchallPredicate.get_hints(
+                        item['children'],
+                        insp.polymorphic_map[_type],
+                        base, context=context
+                    ))
+                continue
+
+            name = item['name']
             prop = insp.get_property(name)
             hints[prop.class_attribute] = (op, item.get('children'))
         if isinstance(context, JsonGuardProvider):
             context.guardHints(cls, hints)
-        ret = []
         for attr, (op, children) in hints.items():
             prop = attr.prop
             hint = None
@@ -545,7 +577,7 @@ class CatchallView(CRUDView):
             return self.delete()
         raise HTTPNotFound()
 
-    @property
+    @ property
     def pager_slice(self):
         if self.slicer is not None:
             return slice(int(self.slicer['start']),
