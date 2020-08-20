@@ -36,6 +36,7 @@ index_parser = Group(
 route_parser = fieldname('verb') + \
     Optional(Suppress('!') + fieldname('cast')) + \
     Optional(Suppress('@') + delimitedList(Word(pkey_chars))('pkey')) + \
-    Optional(Suppress('/') + fieldname('drilldown')) + \
+    Optional(Suppress('/') + fieldname('drilldown') +
+             Optional(Suppress('!') + fieldname('drilldown_cast'))) + \
     Optional(Suppress('[') + index_parser('slice') + Suppress(']')) + \
     Optional(Suppress(':') + hints_parser('hints'))

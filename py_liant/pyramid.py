@@ -419,6 +419,9 @@ class CatchallPredicate:
             target = prop.entity.class_
 
             if prop.lazy == 'dynamic':
+                if 'drilldown_cast' in route:
+                    # we cannot apply polymorphic casting here
+                    return False
                 # special drilldown love for dynamic props
                 query = getattr(getter(query), prop.key)
                 # getter no longer useful
@@ -427,7 +430,21 @@ class CatchallPredicate:
                 # manually construct drilldown query for non-dynamic props
                 pkey_filter = (col == val for col, val in
                                zip(insp.primary_key, pkey))
-                query = request.dbsession.query(prop.entity) \
+                if 'drilldown_cast' in route:
+                    insp = inspect(target)
+                    if insp.polymorphic_on is None:
+                        return False
+                    try:
+                        value = coerce_value(target, insp.polymorphic_on,
+                                            route['drilldown_cast'])
+                    except ValueError:
+                        return False
+                    if value not in insp.polymorphic_map:
+                        return False
+                    insp = insp.polymorphic_map[value]
+                    target = insp.class_
+
+                query = request.dbsession.query(target) \
                     .select_from(prop.parent) \
                     .join(prop.class_attribute) \
                     .filter(and_(*pkey_filter))
