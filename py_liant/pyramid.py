@@ -339,14 +339,14 @@ def _get_by_index(index):
 class CatchallTarget:
     _cls = None
     profiles = dict()
-    default_filters = []
+    filters = []
 
-    def __init__(self, cls, profiles=dict(), default_filters=None):
-        self._cls, self.profiles, self.default_filters = cls, profiles, \
-            default_filters
+    def __init__(self, cls, profiles=dict(), filters=None):
+        self._cls, self.profiles, self.filters = cls, profiles, \
+            filters
 
     def __repr__(self):
-        return f"(cls:{self._cls!r}, profiles:{self.profiles!r}, filters:{self.default_filters!r}"
+        return f"(cls:{self._cls!r}, profiles:{self.profiles!r}, filters:{self.filters!r}"
 
 
 class CatchallPredicate:
@@ -402,7 +402,7 @@ class CatchallPredicate:
                 return False
             insp = insp.polymorphic_map[value]
             target = CatchallTarget(insp.class_, target.profiles,
-                                    target.default_filters)
+                                    target.filters)
 
         query = request.dbsession.query(target._cls)
 
@@ -418,8 +418,11 @@ class CatchallPredicate:
                 return False
             getter = _get_by_pkey(pkey)
         else:
-            if target.default_filters:
-                query = query.filter(*target.default_filters)
+            if target.filters is not None:
+                if type(target.filters) in (list, tuple):
+                    query = query.filter(*target.filters)
+                else:
+                    query = query.filter(target.filters)
 
         if 'drilldown' in route:
             # cannot drilldown property if result is list
