@@ -19,6 +19,8 @@
     - [Drilldown support](#drilldown-support)
     - [Single element from collection](#single-element-from-collection)
     - [Filtering, sorting, pagination](#filtering-sorting-pagination)
+    - [Polymorphic casting](#polymorphic-casting)
+    - [Polymorphic loading hints](#polymorphic-loading-hints)
   - [JsonGuardProvider](#jsonguardprovider)
   - [SearchPathSetter](#searchpathsetter)
   - [EnumAttrs and PythonEnum](#enumattrs-and-pythonenum)
@@ -653,6 +655,8 @@ If route `/parent` points to class `Parent` we can use polymorphic casting to ac
 Using the polymorphic casting syntax exposes all derived class' fields and relationships in the resulting JSON, exposes all fields to `auto_order` and `auto_filters` output, allows hints to refer to derived class` fields and relationships.
 
 Creating a derived class instance is also possible by performing a `POST /parent!<identity>`.
+
+Polymorphic casting is also supported for drilldown collections, i.e. `GET /parent@1/children!girl`. This only works for non-dynamic collections.
 
 ### Polymorphic loading hints
 
