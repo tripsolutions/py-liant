@@ -6,15 +6,14 @@ field_chars = alphanums + '_'
 fieldname = Word(alphas, field_chars)
 
 # a field -- value property to be ignored (-)
-# or loaded if declared deferred (+)
-field = Group(oneOf('+ -')('op') + fieldname('name'))
+field = Group(Literal('-')('op') + fieldname('name'))
 # a relationship, collection or single value, to be loaded
 collection = Forward()
 # a casting directive;
 caster = Forward()
 hints_parser = delimitedList(field | collection | caster)
 hints_parser_nocast = delimitedList(field | collection)
-collection << Group(Literal('*')('op') + fieldname('name') +
+collection << Group(oneOf('+ *')('op') + fieldname('name') +
                     Optional(Suppress('(') + hints_parser +
                              Suppress(')'))('children'))
 caster << Group(Literal("!")('op') + fieldname('type') +
@@ -39,4 +38,5 @@ route_parser = fieldname('verb') + \
     Optional(Suppress('/') + fieldname('drilldown') +
              Optional(Suppress('!') + fieldname('drilldown_cast'))) + \
     Optional(Suppress('[') + index_parser('slice') + Suppress(']')) + \
+    Optional(Suppress(':') + fieldname('profile')) + \
     Optional(Suppress(':') + hints_parser('hints'))

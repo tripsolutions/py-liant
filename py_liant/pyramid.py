@@ -1,3 +1,4 @@
+from typing import Dict
 from pyparsing import ParseException
 from pyramid.request import Request
 from pyramid.httpexceptions import (
@@ -16,7 +17,7 @@ import transaction
 from .json_encoder import JSONEncoder
 from .json_decoder import JSONDecoder
 from .monkeypatch import coerce_value, patch_sqlalchemy_base_class
-from .parser import route_parser
+from .parser import route_parser, hints_parser
 from .interfaces import JsonGuardProvider
 
 
@@ -335,12 +336,31 @@ def _get_by_index(index):
     return _impl
 
 
+class CatchallTarget:
+    _cls = None
+    profiles = dict()
+    default_filters = []
+
+    def __init__(self, cls, profiles=dict(), default_filters=None):
+        self._cls, self.profiles, self.default_filters = cls, profiles, \
+            default_filters
+
+    def __repr__(self):
+        return f"(cls:{self._cls!r}, profiles:{self.profiles!r}, filters:{self.default_filters!r}"
+
+
 class CatchallPredicate:
+    targets: Dict[str, CatchallTarget] = None
+
     def __init__(self, targets, config):
-        def _adapt(obj):
-            if type(obj) is not tuple:
-                return (obj,)
-            return obj
+        def _adapt(obj) -> CatchallTarget:
+            if type(obj) is CatchallTarget:
+                return obj
+            if type(obj) not in (tuple, dict, list):
+                return CatchallTarget(obj)
+            if type(obj) is dict:
+                return CatchallTarget(**obj)
+            return CatchallTarget(*obj)
 
         self.targets = {
             key: _adapt(obj) for key, obj in targets.items()
@@ -366,24 +386,25 @@ class CatchallPredicate:
         if route['verb'] not in self.targets:
             return False
 
-        target = self.targets[route['verb']][0]
+        target = self.targets[route['verb']]
         getter = None
 
-        insp = inspect(target)
+        insp = inspect(target._cls)
         if 'cast' in route:
             if insp.polymorphic_on is None:
                 return False
             try:
-                value = coerce_value(target, insp.polymorphic_on,
+                value = coerce_value(target._cls, insp.polymorphic_on,
                                      route['cast'])
             except ValueError:
                 return False
             if value not in insp.polymorphic_map:
                 return False
             insp = insp.polymorphic_map[value]
-            target = insp.class_
+            target = CatchallTarget(insp.class_, target.profiles,
+                                    target.default_filters)
 
-        query = request.dbsession.query(target)
+        query = request.dbsession.query(target._cls)
 
         # convert pkey
         if 'pkey' in route:
@@ -391,11 +412,14 @@ class CatchallPredicate:
             if len(pkey) != len(insp.primary_key):
                 return False
             try:
-                pkey = tuple(coerce_value(target, col, val)
+                pkey = tuple(coerce_value(target._cls, col, val)
                              for col, val in zip(insp.primary_key, pkey))
             except ValueError:
                 return False
             getter = _get_by_pkey(pkey)
+        else:
+            if target.default_filters:
+                query = query.filter(*target.default_filters)
 
         if 'drilldown' in route:
             # cannot drilldown property if result is list
@@ -416,7 +440,7 @@ class CatchallPredicate:
                 return False
 
             # target switch in drilldown
-            target = prop.entity.class_
+            target = CatchallTarget(prop.entity.class_)
 
             if prop.lazy == 'dynamic':
                 if 'drilldown_cast' in route:
@@ -431,20 +455,20 @@ class CatchallPredicate:
                 pkey_filter = (col == val for col, val in
                                zip(insp.primary_key, pkey))
                 if 'drilldown_cast' in route:
-                    insp = inspect(target)
+                    insp = inspect(target._cls)
                     if insp.polymorphic_on is None:
                         return False
                     try:
-                        value = coerce_value(target, insp.polymorphic_on,
-                                            route['drilldown_cast'])
+                        value = coerce_value(target._cls, insp.polymorphic_on,
+                                             route['drilldown_cast'])
                     except ValueError:
                         return False
                     if value not in insp.polymorphic_map:
                         return False
                     insp = insp.polymorphic_map[value]
-                    target = insp.class_
+                    target = CatchallTarget(insp.class_)
 
-                query = request.dbsession.query(target) \
+                query = request.dbsession.query(target._cls) \
                     .select_from(prop.parent) \
                     .join(prop.class_attribute) \
                     .filter(and_(*pkey_filter))
@@ -465,10 +489,19 @@ class CatchallPredicate:
             else:
                 match['slicer'] = slicer
 
+        profile = None
+        if 'profile' in route:
+            if route['profile'] not in target.profiles:
+                return False
+            profile = target.profiles[route['profile']]
+            profile = hints_parser.parseString(profile, True)
+            hints = self.get_hints(profile, target._cls, context=context)
+            query = query.options(*hints)
+
         # decode hints
         if 'hints' in route:
             try:
-                hints = self.get_hints(route['hints'], target,
+                hints = self.get_hints(route['hints'], target._cls,
                                        context=context)
                 query = query.options(*hints)
             except AssertionError:
@@ -538,11 +571,16 @@ class CatchallPredicate:
                 else:
                     raise AssertionError("invalid op")
             elif isinstance(prop, RelationshipProperty):
-                hint = base.selectinload(attr)
-
-                if children:
-                    CatchallPredicate.get_hints(children, attr.entity,
-                                                hint, context=context)
+                if op == '-':
+                    hint = base.lazyload(attr)
+                else:
+                    if op == '*':
+                        hint = base.selectinload(attr)
+                    else:
+                        hint = base.joinedload(attr)
+                    if children:
+                        CatchallPredicate.get_hints(children, attr.entity,
+                                                    hint, context=context)
             ret.append(hint)
         return ret
 
