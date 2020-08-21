@@ -21,6 +21,8 @@
     - [Filtering, sorting, pagination](#filtering-sorting-pagination)
     - [Polymorphic casting](#polymorphic-casting)
     - [Polymorphic loading hints](#polymorphic-loading-hints)
+    - [Implicit filters](#implicit-filters)
+    - [Hint profiles](#hint-profiles)
   - [JsonGuardProvider](#jsonguardprovider)
   - [SearchPathSetter](#searchpathsetter)
   - [EnumAttrs and PythonEnum](#enumattrs-and-pythonenum)
@@ -673,6 +675,50 @@ Polymorphic loading hints can also be applied to relationships with polymorphic 
 ### Polymorphic identity
 
 The identity value used in both types of polymorphic functionality described above is automatically cast to the polymorphic identifier type. In the examples above the type was string but any supported type can be used. [Enumerables](#enumattrs-and-pythonenum) are encouraged.
+
+### Implicit filters
+
+When defining the catchall view targets using `@view_config`'s `catchall` parameter dictionary, the value passed for each key can be richer than just a target type. You can pass a tuple, an array, a dictionary or an instance of `CatchallTarget`. When passing a tuple, array or dictionary it is passed unmodified to the constructor of `CatchallTarget`.
+
+One possible use for this is to associate a set of filters with a target type. The filter would be applied in addition to any filters provided in the query parameters of the request, except when using the primary key access syntax (`/target@pkey`).
+
+For example:
+
+```python
+@view_defaults(renderer='json', catchall={
+    'parent': {'cls': Parent, 'filters': Parent.active.is_(True)
+})
+@view_config(route_name="catchall", attr='process')
+class MyCatchallView(CatchallView):
+    pass
+```
+
+would ensure that only `Parent` instances with a boolean property `active` set to True would be returned except when accessed using the primary key. Multiple conditions can be provided either by providing an array of conditions (all are applied) or constructing a more complex SQL expression using logic operators (`sql.and_`, `sql.or_`, etc).
+
+### Hint profiles
+
+The `CatchallTarget.profiles` property can be used to provide quick access to loading hint profiles defined server-side. Consider the following example:
+
+```python
+@view_defaults(renderer='json', catchall={
+    'parent': {'cls': Parent, 'profiles': {
+        'with_children': '*children',
+        'with_data': '*data'
+    }})
+@view_config(route_name="catchall", attr='process')
+class MyCatchallView(CatchallView):
+    pass
+```
+
+The profiles can be accessed in an HTTP request using the following syntax:
+
+`GET /praent:with_children`
+
+The hints in the profile can be overridden in the request, or other hints can be provided on top of the ones in the profile:
+
+`GET /parent:with_children:*data`
+
+The full syntax of the loading hints is available in the profile definition.
 
 ## JsonGuardProvider
 
