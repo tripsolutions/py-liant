@@ -15,7 +15,7 @@ from setuptools import find_packages, setup, Command
 NAME = 'py_liant'
 DESCRIPTION = 'Glue together pyramid, sqlalchemy, simplejson to provide a ' \
     'read-write, object-graph-aware JSON API'
-URL = 'https://github.com/georgebarbarosie/py-liant'
+URL = 'https://github.com/tripsolutions/py-liant'
 EMAIL = 'george.barbarosie@gmail.com'
 AUTHOR = 'George Barbăroșie'
 REQUIRES_PYTHON = '>=3.4.0'
