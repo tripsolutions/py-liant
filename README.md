@@ -1,33 +1,40 @@
-- [Introduction](#introduction)
-  - [RESTful API](#restful-api)
-  - [Opinionated](#opinionated)
-  - [Modified JSON](#modified-json)
-- [How to use](#how-to-use)
-- [Reference](#reference)
-  - [JsonObject](#jsonobject)
-  - [JSONEncoder](#jsonencoder)
-  - [JSONDecoder](#jsondecoder)
-  - [pyramid_json_renderer_factory](#pyramidjsonrendererfactory)
-  - [pyramid_json_decoder](#pyramidjsondecoder)
-  - [patch_sqlalchemy_base_class](#patchsqlalchemybaseclass)
-  - [monkeypatch: obj.apply_changes](#monkeypatch-objapplychanges)
-  - [CRUDView](#crudview)
-  - [ConvertMatchdictPredicate](#convertmatchdictpredicate)
-  - [CatchallPredicate](#catchallpredicate)
-  - [CatchallView](#catchallview)
-    - [Hints syntax](#hints-syntax)
-    - [Drilldown support](#drilldown-support)
-    - [Single element from collection](#single-element-from-collection)
-    - [Filtering, sorting, pagination](#filtering-sorting-pagination)
-    - [Polymorphic casting](#polymorphic-casting)
-    - [Polymorphic loading hints](#polymorphic-loading-hints)
-    - [Implicit filters](#implicit-filters)
-    - [Hint profiles](#hint-profiles)
-  - [JsonGuardProvider](#jsonguardprovider)
-  - [SearchPathSetter](#searchpathsetter)
-  - [EnumAttrs and PythonEnum](#enumattrs-and-pythonenum)
+# py-liant
 
-# Introduction
+## Table of Contents
+
+- [py-liant](#py-liant)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+    - [RESTful API](#restful-api)
+    - [Opinionated](#opinionated)
+    - [Modified JSON](#modified-json)
+  - [How to use](#how-to-use)
+  - [Reference](#reference)
+    - [JsonObject](#jsonobject)
+    - [JSONEncoder](#jsonencoder)
+    - [JSONDecoder](#jsondecoder)
+    - [pyramid_json_renderer_factory](#pyramid_json_renderer_factory)
+    - [pyramid_json_decoder](#pyramid_json_decoder)
+    - [patch_sqlalchemy_base_class](#patch_sqlalchemy_base_class)
+    - [monkeypatch: obj.apply_changes](#monkeypatch-objapply_changes)
+    - [CRUDView](#crudview)
+    - [ConvertMatchdictPredicate](#convertmatchdictpredicate)
+    - [CatchallPredicate](#catchallpredicate)
+    - [CatchallView](#catchallview)
+      - [Hints syntax](#hints-syntax)
+      - [Drilldown support](#drilldown-support)
+      - [Single element from collection](#single-element-from-collection)
+      - [Filtering, sorting, pagination](#filtering-sorting-pagination)
+      - [Polymorphic casting](#polymorphic-casting)
+      - [Polymorphic loading hints](#polymorphic-loading-hints)
+      - [Polymorphic identity](#polymorphic-identity)
+      - [Implicit filters](#implicit-filters)
+      - [Hint profiles](#hint-profiles)
+    - [JsonGuardProvider](#jsonguardprovider)
+    - [SearchPathSetter](#searchpathsetter)
+    - [EnumAttrs and PythonEnum](#enumattrs-and-pythonenum)
+
+## Introduction
 
 Py-liant is a library of helpers for rapid creation of opinionated RESTful APIs
 using pyramid and SQLAlchemy. It provides a read-write set of operations using
@@ -37,7 +44,7 @@ with the data models being exposed.
 It was created by Trip Solutions for internal projects but we feel it may prove
 useful for general consumption.
 
-## RESTful API
+### RESTful API
 
 The [CRUDView](#crudview) base class assumes the API follows REST conventions
 and provides CRUD ([C]reate, [R]ead, [U]pdate, [D]elete) functionality, or a
@@ -45,14 +52,14 @@ subset of that. It does not make any assumptions about the endpoints, which are
 still defined in user code. There are assumptions being made about the format of
 the payloads, see [Modified JSON](#modified-json) and [CrudView](#crudview)
 
-## Opinionated
+### Opinionated
 
 The [CatchallView](#catchallview) base class however provides a custom parser
 for the URL string and is heavily opinionated about the structure of the API.
 This allows it to be effortlessly deployed on top of existing SQLAlchemy data
 structures but has the disadvantage of being less customizable.
 
-## Modified JSON
+### Modified JSON
 
 ORM data models are not always trees. Any real-world application beyond a
 certain complexity level is bound to get to a point where mapping deep data
@@ -152,7 +159,7 @@ instance.
 We also provide a pair of encoder / decoder functions for use in javascript
 in [pyliant.js](./pyliant.js).
 
-# How to use
+## How to use
 
 In pyramid's config block you can override the default JSON renderer using the
 following:
@@ -198,16 +205,16 @@ config.include(includeme_factory(base_class=Base))
 Concrete usage examples of [CRUDView](#crudview) and
 [CatchallView](#catchallview) can be found in the reference documentation
 
-# Reference
+## Reference
 
-## JsonObject
+### JsonObject
 
 This class is a `dict` implementation that exposes all string keys as
 properties. It eliminates the need to access dictionary values using index
 notation (`request.json['prop']` becomes `request.json.prop`). The
 [JSONDecoder](#jsondecoder) returns instances of this class.
 
-## JSONEncoder
+### JSONEncoder
 
 A `simplejson.JSONEncoder` implementation that adds the following:
 
@@ -230,7 +237,7 @@ functionality related to SQLAlchemy is disabled.
 
 `kwargs` is passed to `simplejson.JSONEncoder`'s constructor
 
-## JSONDecoder
+### JSONDecoder
 
 A `simplejson.JSONDecoder` implementation that returns a
 [JsonObject](#jsonobject) as a result and handles `_id`/`_ref` logic as
@@ -244,7 +251,7 @@ JSONDecoder(**kwargs)
 
 `**kwargs` is passed to `simplejson.JSONDecoder`'s constructor.
 
-## pyramid_json_renderer_factory
+### pyramid_json_renderer_factory
 
 Factory for a pyramid renderer that provides JSON serialization using
 [JSONEncoder](#jsonencoder). See [How to use](#how-to-use) for usage.
@@ -265,17 +272,17 @@ directly to the WSGI layer. By default the renderer writes directly in the
 pyramid `response` object. When activated, pyramid can no longer handle error
 redirects for execptions thrown during serialization.
 
-## pyramid_json_decoder
+### pyramid_json_decoder
 
 This is a fucnction that can be added to pyramid using
 `config.add_request_method`. See [How to use](#how-to-use) for usage.
 
-## patch_sqlalchemy_base_class
+### patch_sqlalchemy_base_class
 
 This is the function that adds the method
 [apply_changes](#monkeypatch-objapplychanges) to SQLAlchemy's base class.
 
-## monkeypatch: obj.apply_changes
+### monkeypatch: obj.apply_changes
 
 ```python
 obj.apply_changes(data, object_dict=None, context=None, for_update=True)
@@ -312,7 +319,7 @@ If a pyramid `context` is provided that implements
 [JsonGuardProvider](#jsonguardprovider), it will be used for security fencing
 the patching.
 
-## CRUDView
+### CRUDView
 
 This class provides CRUD functionality for a given model class. You can
 configure the routes and views as needed for your application but the
@@ -442,7 +449,7 @@ Doing this is obviously more laborious but allows you to define custom filters o
 The implementation assumes `request.dbsession` is a request method that returns
 a SQLAlchemy database session valid for the model.
 
-## ConvertMatchdictPredicate
+### ConvertMatchdictPredicate
 
 If pyramid has been configured to use this predicate as indicated in [How to
 use](#how-to-use), you can get around the need to convert matchdict parameters.
@@ -499,14 +506,14 @@ After these changes you no longer need the `int()` cast in the
 `identity_filter()` method. You'll also avoid the need to catch the `ValueError`
 exception.
 
-## CatchallPredicate
+### CatchallPredicate
 
 This is a supporting predicate to be used with [CatchallView](#catchallview). It
 assumes the route contains a fizzle parameter of the form `{catchall:.*}` (NOT
 `*catchall`, since the star format creates an array of string values from the
 match) that is then parsed internally and converted to values better suited for the [CatchallView](#catchallview) class.
 
-## CatchallView
+### CatchallView
 
 This is an extension of the [CrudView](#crudview) class that adds support for a
 far richer route format based on internal parsing done by the [CatchallPredicate](#catchallpredicate) and has the ability to:
@@ -545,7 +552,7 @@ This code is enough to expose routes such as:
 In other words, both entity types `Parent` and `Child` are accessible from a
 single point.
 
-### Hints syntax
+#### Hints syntax
 
 However, from your application's perspective alllowing access to
 `Child` at the root level might not be something useful, in other words you
@@ -583,7 +590,7 @@ effectively retrieve all parents and all associated children.
 Please note: dynamic relationship properties cannot be the target of a
 relationship hint.
 
-### Drilldown support
+#### Drilldown support
 
 If the caller wanted to retrieve just the children of a parent of known id they
 could call `GET /parent@1/children`. The last bit of the route is not a hint,
@@ -602,7 +609,7 @@ entities in the relationship being drilled down into. For example, in the reques
 If the property being drilled into is a collection all [Filtering, sorting and
 pagination](#filtering-sorting-pagination) considerations apply.
 
-### Single element from collection
+#### Single element from collection
 
 If the request either refers to a collection property via
 [Drilldown](#drilldown-support) or refers to a collection of entities because it
@@ -612,7 +619,7 @@ from the list by using subscript notation. For example, `GET
 collection. [Filtering and sorting](#filtering-sorting-pagination) are applied
 first.
 
-### Filtering, sorting, pagination
+#### Filtering, sorting, pagination
 
 Filtering, sorting and pagination are applied as described in the
 [CRUDView](#crudview) section. Only `auto_filters` and `auto_order` are used.
@@ -623,7 +630,7 @@ same subscript notation as described in the previous section can be used for
 slicing: `GET /parent[0:10]?order_by=data+desc` retrieves the first 10 `Parent`
 entities in descending `data` order.
 
-### Polymorphic casting
+#### Polymorphic casting
 
 Suppose `Parent` is a polymorphic type defined similar to the following:
 
@@ -660,7 +667,7 @@ Creating a derived class instance is also possible by performing a `POST /parent
 
 Polymorphic casting is also supported for drilldown collections, i.e. `GET /parent@1/children!girl`. This only works for non-dynamic collections.
 
-### Polymorphic loading hints
+#### Polymorphic loading hints
 
 Sometimes you may want to access a collection like `/parent` without polymorphic casting to get acess to `Parent`s of all types but may wish to provide specific loading hints for each dervide type. Provided the derived classes had specific collections and fields (say, `father_data`, `mother_data` were relationships defined specifically for `ParentFather` and `ParentMother` respectively) they can be referred to in the loading hints as such:
 
@@ -672,11 +679,11 @@ Polymorphic loading hints can also be applied to relationships with polymorphic 
 
 `/parent:*children(!boy(*boy_data),!girl(*girl_data))`
 
-### Polymorphic identity
+#### Polymorphic identity
 
 The identity value used in both types of polymorphic functionality described above is automatically cast to the polymorphic identifier type. In the examples above the type was string but any supported type can be used. [Enumerables](#enumattrs-and-pythonenum) are encouraged.
 
-### Implicit filters
+#### Implicit filters
 
 When defining the catchall view targets using `@view_config`'s `catchall` parameter dictionary, the value passed for each key can be richer than just a target type. You can pass a tuple, an array, a dictionary or an instance of `CatchallTarget`. When passing a tuple, array or dictionary it is passed unmodified to the constructor of `CatchallTarget`.
 
@@ -695,7 +702,10 @@ class MyCatchallView(CatchallView):
 
 would ensure that only `Parent` instances with a boolean property `active` set to True would be returned except when accessed using the primary key. Multiple conditions can be provided either by providing an array of conditions (all are applied) or constructing a more complex SQL expression using logic operators (`sql.and_`, `sql.or_`, etc).
 
-### Hint profiles
+Filters can also be defined as a callable that accepts the pyramid request as an argument and returns
+the filter(s) dynamically. This is useful to provide a substitute for [CRUDView](#crudview)'s context filters.
+
+#### Hint profiles
 
 The `CatchallTarget.profiles` property can be used to provide quick access to loading hint profiles defined server-side. Consider the following example:
 
@@ -720,7 +730,7 @@ The hints in the profile can be overridden in the request, or other hints can be
 
 The full syntax of the loading hints is available in the profile definition.
 
-## JsonGuardProvider
+### JsonGuardProvider
 
 For security considerations the flexibility offered by this library can be
 detrimental. Model classes can contain references to entities that need to be
@@ -817,7 +827,7 @@ class MyContext(JsonGuardProvider):
 config.add_route("catchall", '{catchall:.*}', factory=MyContext)
 ```
 
-## SearchPathSetter
+### SearchPathSetter
 
 This is a PostgreSQL specific addition that can be used to set up the schema
 search path for all newly created database connection. It's implemented as a
@@ -827,7 +837,7 @@ uses the modern events API is currently in the works.
 It is very unlikely you will need to use this class in your project unless you
 need to use multi-tenant databases with configurable schemas.
 
-## EnumAttrs and PythonEnum
+### EnumAttrs and PythonEnum
 
 `PythonEnum` is a custom implementation of `sqlalchemy.types.Enum` that is
 useful in PostgreSQL for declaring named enum types.

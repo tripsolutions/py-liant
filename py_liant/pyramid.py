@@ -325,6 +325,10 @@ def _get_by_pkey(pkey):
         return q.get(pkey)
     return _impl
 
+def _get_by_combinedfilter(pkey_filter):
+    def _impl(q):
+        return q.filter(*pkey_filter).one()
+    return _impl
 
 # TODO: reverse order for negative indexes (?)
 def _get_by_index(index):
@@ -406,6 +410,15 @@ class CatchallPredicate:
 
         query = request.dbsession.query(target._cls)
 
+        if target.filters is not None:
+            filters = target.filters
+            if callable(filters):
+                filters = filters(request)
+            if type(filters) not in (list, tuple):
+                filters = (filters,)
+
+            query = query.filter(*filters)
+
         # convert pkey
         if 'pkey' in route:
             pkey = route['pkey']
@@ -416,13 +429,16 @@ class CatchallPredicate:
                              for col, val in zip(insp.primary_key, pkey))
             except ValueError:
                 return False
-            getter = _get_by_pkey(pkey)
-        else:
-            if target.filters is not None:
-                if type(target.filters) in (list, tuple):
-                    query = query.filter(*target.filters)
-                else:
-                    query = query.filter(target.filters)
+            if query.whereclause is None:
+                # no implicit/context filters
+                getter = _get_by_pkey(pkey)
+                print (str(query.whereclause))
+            else:
+                filters = map(
+                    lambda x: x[0]==x[1], 
+                    zip(insp.primary_key, pkey)
+                    )
+                getter = _get_by_combinedfilter(filters)
 
         if 'drilldown' in route:
             # cannot drilldown property if result is list
