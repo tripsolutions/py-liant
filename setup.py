@@ -83,6 +83,8 @@ class UploadCommand(Command):
 tests_require = [
     'pytest >= 3.7.4',
     'pytest-cov',
+    'zope.sqlalchemy',
+    'pyramid_tm'
 ]
 
 # Where the magic happens:
