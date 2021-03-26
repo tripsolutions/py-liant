@@ -358,7 +358,7 @@ class CatchallPredicate:
 
     def __init__(self, targets, config):
         def _adapt(obj) -> CatchallTarget:
-            if type(obj) is CatchallTarget:
+            if isinstance(obj, CatchallTarget):
                 return obj
             if type(obj) not in (tuple, dict, list):
                 return CatchallTarget(obj)
