@@ -432,7 +432,6 @@ class CatchallPredicate:
             if query.whereclause is None:
                 # no implicit/context filters
                 getter = _get_by_pkey(pkey)
-                print (str(query.whereclause))
             else:
                 filters = map(
                     lambda x: x[0]==x[1], 
