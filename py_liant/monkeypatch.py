@@ -165,7 +165,10 @@ def _polymorphic_constructor(cls, data):
     if polymorphic_col is None:
         return cls()
     polymorphic_prop = cls.__mapper__.get_property_by_column(polymorphic_col)
-    identity = coerce_value(cls, data[polymorphic_prop.key], polymorphic_col)
+    if polymorphic_prop.key not in data:
+        # assume this was intentional
+        return cls()
+    identity = coerce_value(cls, polymorphic_col, data[polymorphic_prop.key])
     return cls.__mapper__.polymorphic_map[identity].class_()
 
 
