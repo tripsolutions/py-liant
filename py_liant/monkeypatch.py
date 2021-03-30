@@ -1,22 +1,23 @@
-from sqlalchemy.inspection import inspect
-from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
-from sqlalchemy.dialects.postgresql import HSTORE, UUID
-from sqlalchemy.types import ARRAY
-from sqlalchemy import cast
-from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
-from sqlalchemy import (Column, String, DateTime, Time)
-from sqlalchemy.orm import (
-    ColumnProperty, CompositeProperty, SynonymProperty, RelationshipProperty,
-    Mapper, Session)
-from collections import OrderedDict
-from decimal import Decimal
-from pyramid.settings import asbool
-from datetime import date, time, datetime
-from dateutil import parser, tz
-from enum import Enum
-from .interfaces import JsonGuardProvider
 import base64
 import uuid
+from collections import OrderedDict
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
+
+from dateutil import parser, tz
+from sqlalchemy import Column, DateTime, String, Time, cast
+from sqlalchemy.dialects.postgresql import HSTORE, UUID
+from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
+from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
+from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import (ColumnProperty, CompositeProperty, Mapper,
+                            RelationshipProperty, Session, SynonymProperty)
+from sqlalchemy.types import ARRAY
+
+from pyramid.settings import asbool
+
+from .interfaces import JsonGuardProvider
 
 
 def coerce_value(cls, column, value, size_check=True):
