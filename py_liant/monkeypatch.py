@@ -1,6 +1,8 @@
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
 from sqlalchemy.dialects.postgresql import HSTORE, UUID
+from sqlalchemy.types import ARRAY
+from sqlalchemy import cast
 from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
 from sqlalchemy import (Column, String, DateTime, Time)
 from sqlalchemy.orm import (
@@ -122,6 +124,13 @@ def coerce_value(cls, column, value, size_check=True):
 
     if python_type is bytes:
         return base64.b64decode(value)
+    
+    if python_type is list:
+        if column.type is ARRAY or isinstance(column.type, ARRAY):
+            # use SQL casting for arrays
+            return cast(value, column.type)
+        raise NotImplementedError(f'py_liant does not support {column.type!r} '
+                                  'yet')
 
     if issubclass(python_type, Enum) and value is not None:
         value = str(value)
