@@ -12,7 +12,7 @@ from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import (ColumnProperty, CompositeProperty, Mapper,
-                            RelationshipProperty, Session, SynonymProperty)
+                            RelationshipProperty, Session, SynonymProperty, column_property)
 from sqlalchemy.types import ARRAY
 
 from pyramid.settings import asbool
@@ -210,7 +210,7 @@ def __apply_changes(self, data, object_dict=None, context=None,
             # the setter method
             setter = getattr(attr, 'fset', None)
             if setter is None:
-                return
+                continue
             setter(self, value)
         elif attr.is_attribute and hasattr(attr, 'property'):
             prop = attr.property
@@ -219,17 +219,16 @@ def __apply_changes(self, data, object_dict=None, context=None,
                 assert len(prop.columns) == 1
                 column = prop.columns[0]
                 if not isinstance(column, Column):
-                    return
+                    continue
 
                 # updating a primary key column with autoincrement: no
                 if column in (table._autoincrement_column
                               for table in mapper.tables
                               if table._autoincrement_column is not None):
-                    pass  # continue
+                    continue
 
                 value = coerce_value(type(self), column, value)
                 attr.__set__(self, value)
-                pass
             elif isinstance(prop, CompositeProperty):
                 # composite properties are also quite hard to get right;
                 # should rely either on constructor or on value coercion
