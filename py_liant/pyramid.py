@@ -1,25 +1,26 @@
 from typing import Dict
-from pyparsing import ParseException
-from pyramid.request import Request
-from pyramid.httpexceptions import (
-    HTTPNotFound, HTTPServerError, HTTPConflict, HTTPOk)
-from sqlalchemy.orm.util import AliasedClass
-from sqlalchemy.orm.exc import (NoResultFound, StaleDataError)
-from sqlalchemy.exc import InvalidRequestError
-from sqlalchemy.orm.base import NOT_EXTENSION
-from sqlalchemy.orm import ColumnProperty, RelationshipProperty, Mapper
-from sqlalchemy import String, orm, and_
-from sqlalchemy.inspection import inspect
-from pyramid.settings import asbool
+
 import transaction
+from pyparsing import ParseException
+from sqlalchemy import String, and_, orm
+from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import ColumnProperty, Mapper, RelationshipProperty
+from sqlalchemy.orm.base import NOT_EXTENSION
+from sqlalchemy.orm.exc import NoResultFound, StaleDataError
+from sqlalchemy.orm.util import AliasedClass
 
+from pyramid.httpexceptions import (HTTPConflict, HTTPNotFound, HTTPOk,
+                                    HTTPServerError)
+from pyramid.request import Request
+from pyramid.settings import asbool
 
-from .json_encoder import JSONEncoder
-from .json_decoder import JSONDecoder
-from .monkeypatch import coerce_value, patch_sqlalchemy_base_class
-from .parser import route_parser, hints_parser
 from .interfaces import JsonGuardProvider
-
+from .json_decoder import JSONDecoder
+from .json_encoder import JSONEncoder
+from .monkeypatch import (_polymorphic_constructor, coerce_value,
+                          patch_sqlalchemy_base_class)
+from .parser import hints_parser, route_parser
 
 # Returns a renderer for pyramid; base_type (SQLAlchemy declarative base) is
 # needed to detect sqlalchemy object instances
@@ -230,8 +231,8 @@ class CRUDView(object):
         return self.request.dbsession.merge(old)
 
     def insert(self):
-        obj = self.target_type()
         values = self.sanitize_input()
+        obj = _polymorphic_constructor(self.target_type, values)
         with transaction.manager:
             self.request.dbsession.add(obj)
             self.apply_changes(obj, values, False)
