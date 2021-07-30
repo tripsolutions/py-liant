@@ -278,6 +278,10 @@ class CRUDView(object):
             ret[f'{key}_isnull'] = \
                 lambda x, attr=item: attr.is_(None) if asbool(x) else \
                 attr.isnot(None)
+            ret[f'{key}_in'] = \
+                lambda x, attr=item: attr.in_([
+                    coerce_func(_, attr) for _ in x.split(',')
+                    ])
         return ret
 
     @classmethod
