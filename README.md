@@ -409,11 +409,16 @@ Pagination is supported via GET parameters `page` and `pageSize` (i.e., `GET
 Implicit filters and sorting are provided for all column properties. Assuming
 column properties `id` and `data` for class `User`, the following filters will be
 added to `self.filters` (in the example usage above, during construction, see
-the `auto_filters()` call): `id`, `id_lt`, `id_le`, `id_gt`, `id_ge`, `id_isnull`, `data`, `data_lt`,
-`data_le`, `data_gt`, `data_ge`, `data_like`, `data_isnull`. The filters `[field_name]_[operator]`
+the `auto_filters()` call): `id`, `id_lt`, `id_le`, `id_gt`, `id_ge`, `id_isnull`,
+`id_in`, `data`, `data_lt`, `data_le`, `data_gt`, `data_ge`, `data_like`,
+`data_isnull`, `data_in`. The filters `[field_name]_[operator]`
 provide filtering using the `less-than`, `less-or-equal`, `greater-than`,
-`greater-or-equal`, `contains` and `is-null` operators. The `contains` operator is automatically generated
-for string column properties only. The `is-null` operator accepts a boolean-like value and has the effect of applying the SQL `IS NULL` operator if given a truthy value and `IS NOT NULL` operator if given a falsey value.
+`greater-or-equal`, `contains`, `is-null` and `in` operators. The `contains`
+operator is automatically generated for string column properties only. The
+`is-null` operator accepts a boolean-like value and has the effect of applying
+the SQL `IS NULL` operator if given a truthy value and `IS NOT NULL` operator
+if given a falsey value. The `in` operator accepts a comma-delimited list of
+values and checks if the field contains one of the listed values.
 
 Automatic sorting keys are also added (in the example usage above see the call to
 `auto_order()`) for both fields.
