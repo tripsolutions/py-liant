@@ -8,8 +8,8 @@ from enum import Enum
 from dateutil import parser, tz
 from sqlalchemy import Column, DateTime, String, Time, cast
 from sqlalchemy.dialects.postgresql import HSTORE, UUID
-from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
-from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
+from sqlalchemy.ext.associationproxy import AssociationProxyExtensionType
+from sqlalchemy.ext.hybrid import HybridExtensionType
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import (ColumnProperty, CompositeProperty, Mapper,
                             RelationshipProperty, Session, SynonymProperty, column_property)
@@ -204,7 +204,7 @@ def __apply_changes(self, data, object_dict=None, context=None,
 
         value = data[key]
 
-        if attr.extension_type == HYBRID_PROPERTY:
+        if attr.extension_type == HybridExtensionType:
             # for hybrid properties we cannot rely on any typing system;
             # all checks and conversions if any are needed should be done by
             # the setter method
@@ -242,7 +242,7 @@ def __apply_changes(self, data, object_dict=None, context=None,
                 raise AssertionError(
                     f'Unexpected property type {type(prop)!r} in '
                     f'{type(self)!r}: {key}')
-        elif attr.extension_type == ASSOCIATION_PROXY:
+        elif attr.extension_type == AssociationProxyExtensionType:
             raise NotImplementedError(
                 'association proxy updates not supported')
         else:

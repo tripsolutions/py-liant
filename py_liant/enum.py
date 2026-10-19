@@ -1,12 +1,15 @@
 import re
 from sqlalchemy.types import SchemaType, TypeDecorator, Enum
+from sqlalchemy import cast
+from sqlalchemy.dialects.postgresql import ARRAY
 
 
-def EnumAttrs(name, schema=None):
+def EnumAttrs(name, schema=None, json_use_values=False):
     def f(cls):
         if schema is not None:
             cls.__db_schema = schema
         cls.__db_name = name
+        cls._json_use_values = json_use_values
         return cls
     return f
 
@@ -48,3 +51,23 @@ class PythonEnum(TypeDecorator, SchemaType):
 
     def __repr__(self):
         return repr(self.impl)
+
+
+class ArrayOfEnum(ARRAY):
+    def bind_expression(self, bindvalue):
+        return cast(bindvalue, self)
+
+    def result_processor(self, dialect, coltype):
+        super_rp = super(ArrayOfEnum, self).result_processor(dialect, coltype)
+
+        def handle_raw_string(value):
+            if value is None:
+                return []
+            inner = re.match(r"^{(.*)}$", value).group(1)
+            if not len(inner):
+                return []
+            return inner.split(",")
+
+        def process(value):
+            return super_rp(handle_raw_string(value))
+        return process

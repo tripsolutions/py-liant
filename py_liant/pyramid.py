@@ -6,7 +6,7 @@ from sqlalchemy import String, and_, orm
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import ColumnProperty, Mapper, RelationshipProperty
-from sqlalchemy.orm.base import NOT_EXTENSION
+from sqlalchemy.orm.base import NotExtension
 from sqlalchemy.orm.exc import NoResultFound, StaleDataError
 from sqlalchemy.orm.util import AliasedClass
 
@@ -248,7 +248,7 @@ class CRUDView(object):
     @classmethod
     def auto_fields(cls, target):
         return [item for item in inspect(target).all_orm_descriptors.values()
-                if item.is_attribute and item.extension_type == NOT_EXTENSION
+                if item.is_attribute and item.extension_type == NotExtension
                 and isinstance(item.property, ColumnProperty)]
 
     @classmethod
@@ -278,10 +278,6 @@ class CRUDView(object):
             ret[f'{key}_isnull'] = \
                 lambda x, attr=item: attr.is_(None) if asbool(x) else \
                 attr.isnot(None)
-            ret[f'{key}_in'] = \
-                lambda x, attr=item: attr.in_([
-                    coerce_func(_, attr) for _ in x.split(',')
-                    ])
         return ret
 
     @classmethod

@@ -2,8 +2,8 @@ import simplejson
 from datetime import (datetime, date, time, timedelta)
 from isodate import duration_isoformat
 from sqlalchemy.inspection import inspect
-from sqlalchemy.ext.hybrid import HYBRID_METHOD
-from sqlalchemy.ext.associationproxy import ASSOCIATION_PROXY
+from sqlalchemy.ext.hybrid import HybridExtensionType
+from sqlalchemy.ext.associationproxy import AssociationProxyExtensionType
 import base64
 from enum import Enum
 import uuid
@@ -70,8 +70,8 @@ class JSONEncoder(simplejson.JSONEncoder):
                 key: getattr(o, key)
                 for key, value in descriptors
                 if key != '__mapper__' and key not in state.unloaded
-                and value.extension_type not in (HYBRID_METHOD,
-                                                 ASSOCIATION_PROXY)
+                and value.extension_type not in (HybridExtensionType,
+                                                 AssociationProxyExtensionType)
                 and (not hasattr(value, 'property')
                      or value.property not in composite_props)
             })
