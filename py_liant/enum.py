@@ -16,12 +16,14 @@ def EnumAttrs(name, schema=None, json_use_values=False):
 
 class PythonEnum(TypeDecorator, SchemaType):
     impl = Enum
+    cache_ok = True
 
     def __init__(self, enum_class, **kw):
         if hasattr(enum_class, "__db_name") and 'name' not in kw:
             kw['name'] = getattr(enum_class, "__db_name")
         if hasattr(enum_class, "__db_schema") and 'schema' not in kw:
             kw['schema'] = getattr(enum_class, "__db_schema")
+
         if 'name' not in kw:
             kw['name'] = "ck%s" % re.sub('([A-Z])',
                                          lambda m: '_' + m.group(1).lower(),
@@ -54,6 +56,10 @@ class PythonEnum(TypeDecorator, SchemaType):
 
 
 class ArrayOfEnum(ARRAY):
+    def _gen_dialect_impl(self, dialect):
+        # keep this class instead of adapting to the dialect's ARRAY
+        return self
+
     def bind_expression(self, bindvalue):
         return cast(bindvalue, self)
 
@@ -71,3 +77,4 @@ class ArrayOfEnum(ARRAY):
         def process(value):
             return super_rp(handle_raw_string(value))
         return process
+
